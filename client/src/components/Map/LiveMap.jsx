@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GoogleMap, LoadScript, Marker, InfoWindow } from '@react-google-maps/api';
+import { motion } from 'framer-motion';
 import api from '../../utils/api';
 import { MapPin, Navigation } from 'lucide-react';
 

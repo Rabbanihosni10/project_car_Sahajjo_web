@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import { LogOut, User, MapPin, Briefcase, MessageCircle, ShoppingCart, Car } from 'lucide-react';
+import { motion } from 'framer-motion';
 import api from '../utils/api';
 
 const Dashboard = () => {
