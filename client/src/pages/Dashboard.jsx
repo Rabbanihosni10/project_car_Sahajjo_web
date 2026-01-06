@@ -3,6 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import { LogOut, User, MapPin, Briefcase, MessageCircle, ShoppingCart, Car } from 'lucide-react';
 import api from '../utils/api';
+import ThemeToggle from '../components/ThemeToggle';
+import NotificationBell from '../components/Notifications/NotificationBell';
 
 const Dashboard = () => {
   const { user, logout, isAdmin, isDriver, isOwner } = useAuth();
@@ -28,8 +30,10 @@ const Dashboard = () => {
   }, [isDriver, isOwner]);
 
   useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+    if (isDriver || isOwner) {
+      fetchStats();
+    }
+  }, [fetchStats, isDriver, isOwner]);
 
   const quickActions = isAdmin
     ? [
@@ -60,6 +64,8 @@ const Dashboard = () => {
             🚗 Car Sahajjo
           </Link>
           <div className="flex items-center gap-4">
+            <ThemeToggle />
+            <NotificationBell />
             <span className="text-white">{user?.name}</span>
             <span className="px-3 py-1 bg-blue-500 text-white rounded-full text-sm">
               {user?.role}
