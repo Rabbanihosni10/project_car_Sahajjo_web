@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { Trash2, CheckCircle, XCircle, Undo, Users, LogOut } from 'lucide-react';
+import { motion } from 'framer-motion';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 
