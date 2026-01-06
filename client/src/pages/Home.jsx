@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Car, Users, MapPin, ShoppingBag, MessageCircle, Shield } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const Home = () => {
   const { isAuthenticated } = useAuth();

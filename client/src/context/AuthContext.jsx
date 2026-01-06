@@ -24,7 +24,10 @@ export const AuthProvider = ({ children }) => {
       setUser(response.data.user);
     } catch (error) {
       console.error('Fetch user error:', error);
-      logout();
+      // Don't logout on initial load if backend is down
+      if (error.response?.status === 401) {
+        logout();
+      }
     } finally {
       setLoading(false);
     }
