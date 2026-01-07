@@ -1,10 +1,8 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import { Car, Users, MapPin, ShoppingBag, MessageCircle, Shield } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const Home = () => {
-  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   const features = [
@@ -53,29 +51,18 @@ const Home = () => {
             🚗 Car Sahajjo
           </motion.div>
           <div className="flex gap-4">
-            {isAuthenticated ? (
-              <Link
-                to="/dashboard"
-                className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all"
-              >
-                Dashboard
-              </Link>
-            ) : (
-              <>
-                <Link
-                  to="/login"
-                  className="px-6 py-2 text-gray-700 dark:text-white hover:bg-white/10 rounded-lg transition-all"
-                >
-                  Login
-                </Link>
-                <Link
-                  to="/register"
-                  className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all"
-                >
-                  Get Started
-                </Link>
-              </>
-            )}
+            <Link
+              to="/login"
+              className="px-6 py-2 text-gray-700 dark:text-white hover:bg-white/10 rounded-lg transition-all"
+            >
+              Login
+            </Link>
+            <Link
+              to="/register"
+              className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all"
+            >
+              Get Started
+            </Link>
           </div>
         </div>
       </nav>

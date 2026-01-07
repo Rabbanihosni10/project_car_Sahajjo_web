@@ -1,7 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GoogleMap, LoadScript, Marker, InfoWindow } from '@react-google-maps/api';
+import { GoogleMap, LoadScript, Marker, InfoWindow, TrafficLayer } from '@react-google-maps/api';
+import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import api from '../../utils/api';
-import { MapPin, Navigation } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { MapPin, Navigation, Wrench, AlertCircle, RefreshCw } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const mapContainerStyle = {
   width: '100%',
@@ -13,64 +17,147 @@ const center = {
   lng: 90.4125,
 };
 
-// Hardcoded garage locations in Dhaka
-const garages = [
-  { id: 1, name: 'Uttara Auto Service', position: { lat: 23.8759, lng: 90.3795 } },
-  { id: 2, name: 'Mirpur Car Center', position: { lat: 23.8223, lng: 90.3654 } },
-  { id: 3, name: 'Dhanmondi Motors', position: { lat: 23.7461, lng: 90.3742 } },
-  { id: 4, name: 'Gulshan Garage Hub', position: { lat: 23.7806, lng: 90.4172 } },
-  { id: 5, name: 'Banani Auto Repair', position: { lat: 23.7937, lng: 90.4066 } },
-];
+const libraries = ['places'];
 
 const LiveMap = () => {
+  const { user, isOwner, isDriver } = useAuth();
   const [drivers, setDrivers] = useState([]);
   const [selectedMarker, setSelectedMarker] = useState(null);
   const [userLocation, setUserLocation] = useState(center);
+  const [nearbyGarages, setNearbyGarages] = useState([]);
+  const [showTraffic, setShowTraffic] = useState(true);
+  const [map, setMap] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  const fetchDrivers = useCallback(async () => {
-    try {
-      const response = await api.get('/users/drivers/locations');
-      setDrivers(response.data.drivers || []);
-    } catch (error) {
-      console.error('Error fetching drivers:', error);
-    }
-  }, []);
-
-  // Simulate driver movement by randomly updating lat/lng
-  const simulateDriverMovement = () => {
-    setDrivers((prevDrivers) =>
-      prevDrivers.map((driver) => ({
-        ...driver,
-        location: {
-          latitude: driver.location.latitude + (Math.random() - 0.5) * 0.0001,
-          longitude: driver.location.longitude + (Math.random() - 0.5) * 0.0001,
-          lastUpdated: new Date(),
-        },
-      }))
-    );
-  };
-
-  useEffect(() => {
-    fetchDrivers();
-    const interval = setInterval(simulateDriverMovement, 3000);
-    return () => clearInterval(interval);
-  }, [fetchDrivers]);
+  // All functions declared FIRST
 
   const getUserLocation = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setUserLocation({
+          const newLocation = {
             lat: position.coords.latitude,
             lng: position.coords.longitude,
-          });
+          };
+          setUserLocation(newLocation);
+          toast.success('Location updated');
         },
         (error) => {
           console.error('Error getting location:', error);
+          toast.error('Could not get your location. Using default location.');
         }
       );
+    } else {
+      toast.error('Geolocation not supported by your browser');
     }
   };
+
+  const fetchDrivers = useCallback(async () => {
+    try {
+      const response = await api.get('/users/drivers/locations');
+      console.log('Driver locations response:', response.data);
+      setDrivers(response.data.drivers || []);
+    } catch (error) {
+      console.error('Error fetching drivers:', error);
+      toast.error('Failed to fetch drivers');
+    }
+  }, []);
+
+  const simulateDriverMovement = () => {
+    setDrivers((prevDrivers) =>
+      prevDrivers.map((driver) => {
+        const lat = driver.location?.latitude || driver.location?.lat;
+        const lng = driver.location?.longitude || driver.location?.lng;
+        return {
+          ...driver,
+          location: {
+            latitude: lat + (Math.random() - 0.5) * 0.001,
+            longitude: lng + (Math.random() - 0.5) * 0.001,
+            lastUpdated: new Date(),
+          },
+        };
+      })
+    );
+  };
+
+  const searchNearbyGarages = useCallback(() => {
+    if (!map || !window.google) {
+      toast.error('Map not ready');
+      return;
+    }
+
+    setLoading(true);
+    const service = new window.google.maps.places.PlacesService(map);
+    
+    const request = {
+      location: userLocation,
+      radius: 5000, // 5km radius
+      type: ['car_repair', 'car_dealer'],
+      keyword: 'garage auto repair service center',
+    };
+
+    service.nearbySearch(request, (results, status) => {
+      setLoading(false);
+      if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
+        const garages = results.slice(0, 10).map((place, index) => ({
+          id: `garage-${index}`,
+          name: place.name,
+          position: {
+            lat: place.geometry.location.lat(),
+            lng: place.geometry.location.lng(),
+          },
+          address: place.vicinity,
+          rating: place.rating,
+          isOpen: place.opening_hours?.open_now,
+        }));
+        setNearbyGarages(garages);
+        toast.success(`Found ${garages.length} nearby garages`);
+      } else {
+        toast.error('Could not find nearby garages');
+        console.error('Places search failed:', status);
+      }
+    });
+  }, [map, userLocation]);
+
+  const onMapLoad = useCallback((mapInstance) => {
+    setMap(mapInstance);
+  }, []);
+
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) *
+        Math.cos(lat2 * (Math.PI / 180)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return (R * c).toFixed(2);
+  };
+
+  // NOW useEffect with all functions already declared
+  useEffect(() => {
+    fetchDrivers();
+    getUserLocation();
+    const interval = setInterval(simulateDriverMovement, 5000);
+    return () => clearInterval(interval);
+  }, [fetchDrivers]);
+
+  // Show loading state while Google Maps library is loading
+  if (!window.google) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-6">
+        <div className="text-center">
+          <MapPin className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+          <h2 className="text-2xl font-bold mb-2 dark:text-white">Loading Map...</h2>
+          <p className="text-gray-600 dark:text-gray-300 mb-4">Please wait while we initialize the map.</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-blue-500 mx-auto"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800 p-6">
@@ -83,15 +170,18 @@ const LiveMap = () => {
         >
           <h1 className="text-4xl font-bold mb-2 dark:text-white flex items-center gap-3">
             <MapPin className="w-10 h-10 text-blue-500" />
-            Live Map & Service Centers
+            {isOwner ? 'Find Drivers' : 'Live Map & Service Centers'}
           </h1>
           <p className="text-gray-600 dark:text-gray-300">
-            Track drivers in real-time and find nearby garages
+            {isOwner 
+              ? 'Discover available drivers near you for your jobs'
+              : 'Track drivers in real-time, find nearby garages, and check traffic conditions'
+            }
           </p>
         </motion.div>
 
         {/* Map Controls */}
-        <div className="mb-4 flex gap-4">
+        <div className="mb-4 flex flex-wrap gap-4">
           <button
             onClick={getUserLocation}
             className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-2 transition-all"
@@ -99,12 +189,58 @@ const LiveMap = () => {
             <Navigation className="w-4 h-4" />
             My Location
           </button>
+          {isDriver && (
+            <button
+              onClick={searchNearbyGarages}
+              disabled={loading}
+              className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg flex items-center gap-2 transition-all disabled:opacity-50"
+            >
+              <Wrench className="w-4 h-4" />
+              {loading ? 'Searching...' : 'Find Nearby Garages'}
+            </button>
+          )}
           <button
             onClick={fetchDrivers}
-            className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-all"
+            className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg flex items-center gap-2 transition-all"
           >
+            <RefreshCw className="w-4 h-4" />
             Refresh Drivers
           </button>
+          <button
+            onClick={() => setShowTraffic(!showTraffic)}
+            className={`px-4 py-2 ${
+              showTraffic ? 'bg-red-500 hover:bg-red-600' : 'bg-gray-500 hover:bg-gray-600'
+            } text-white rounded-lg flex items-center gap-2 transition-all`}
+          >
+            <AlertCircle className="w-4 h-4" />
+            {showTraffic ? 'Hide Traffic' : 'Show Traffic'}
+          </button>
+        </div>
+
+        {/* Legend */}
+        <div className="mb-4 glass p-4 rounded-lg flex flex-wrap gap-4 items-center">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded-full bg-blue-500"></div>
+            <span className="text-sm dark:text-white">Your Location</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded-full bg-green-500"></div>
+            <span className="text-sm dark:text-white">
+              {isOwner ? 'Available Drivers' : 'Drivers Online'}
+            </span>
+          </div>
+          {isDriver && (
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded-full bg-red-500"></div>
+              <span className="text-sm dark:text-white">Service Centers</span>
+            </div>
+          )}
+          {showTraffic && (
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-red-500" />
+              <span className="text-sm dark:text-white">Traffic Enabled (Red = Heavy, Yellow = Moderate)</span>
+            </div>
+          )}
         </div>
 
         {/* Map Container */}
@@ -113,52 +249,68 @@ const LiveMap = () => {
           animate={{ opacity: 1, scale: 1 }}
           className="glass rounded-2xl overflow-hidden shadow-2xl"
         >
-          <LoadScript googleMapsApiKey="YOUR_GOOGLE_MAPS_API_KEY">
+          <LoadScript 
+            googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8'} 
+            libraries={libraries}
+            onError={() => {
+              console.error('Failed to load Google Maps API');
+              toast.error('Failed to load map. Please check your API key.');
+            }}
+          >
             <GoogleMap
               mapContainerStyle={mapContainerStyle}
               center={userLocation}
-              zoom={12}
+              zoom={13}
+              onLoad={onMapLoad}
               options={{
-                styles: [
-                  {
-                    featureType: 'poi',
-                    elementType: 'labels',
-                    stylers: [{ visibility: 'off' }],
-                  },
-                ],
+                zoomControl: true,
+                streetViewControl: true,
+                mapTypeControl: true,
+                fullscreenControl: true,
               }}
             >
+              {/* Traffic Layer */}
+              {showTraffic && <TrafficLayer />}
+
               {/* User Location Marker */}
               <Marker
                 position={userLocation}
                 icon={{
                   url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png',
+                  scaledSize: new window.google.maps.Size(40, 40),
                 }}
                 onClick={() => setSelectedMarker({ type: 'user', data: { name: 'You' } })}
               />
 
               {/* Driver Markers */}
-              {drivers.map((driver) => (
-                <Marker
-                  key={driver._id}
-                  position={{
-                    lat: driver.location.latitude,
-                    lng: driver.location.longitude,
-                  }}
-                  icon={{
-                    url: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png',
-                  }}
-                  onClick={() => setSelectedMarker({ type: 'driver', data: driver })}
-                />
-              ))}
+              {drivers && drivers.length > 0 && drivers.map((driver) => {
+                const lat = driver.location?.latitude || driver.location?.lat;
+                const lng = driver.location?.longitude || driver.location?.lng;
+                if (!lat || !lng) return null;
+                return (
+                  <Marker
+                    key={driver._id}
+                    position={{
+                      lat: parseFloat(lat),
+                      lng: parseFloat(lng),
+                    }}
+                    icon={{
+                      url: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png',
+                      scaledSize: new window.google.maps.Size(35, 35),
+                    }}
+                    onClick={() => setSelectedMarker({ type: 'driver', data: driver })}
+                  />
+                );
+              })}
 
-              {/* Garage Markers */}
-              {garages.map((garage) => (
+              {/* Garage Markers - Only show for drivers */}
+              {isDriver && nearbyGarages.map((garage) => (
                 <Marker
                   key={garage.id}
                   position={garage.position}
                   icon={{
                     url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png',
+                    scaledSize: new window.google.maps.Size(35, 35),
                   }}
                   onClick={() => setSelectedMarker({ type: 'garage', data: garage })}
                 />
@@ -172,30 +324,62 @@ const LiveMap = () => {
                       ? userLocation
                       : selectedMarker.type === 'driver'
                       ? {
-                          lat: selectedMarker.data.location.latitude,
-                          lng: selectedMarker.data.location.longitude,
+                          lat: parseFloat(selectedMarker.data.location?.latitude || selectedMarker.data.location?.lat),
+                          lng: parseFloat(selectedMarker.data.location?.longitude || selectedMarker.data.location?.lng),
                         }
                       : selectedMarker.data.position
                   }
                   onCloseClick={() => setSelectedMarker(null)}
                 >
-                  <div className="p-2">
+                  <div className="p-2 min-w-[200px]">
                     <h3 className="font-bold text-lg mb-1">
                       {selectedMarker.type === 'user'
-                        ? 'Your Location'
+                        ? '📍 Your Location'
                         : selectedMarker.type === 'driver'
-                        ? selectedMarker.data.name
-                        : selectedMarker.data.name}
+                        ? `🚗 ${selectedMarker.data.name}`
+                        : `🔧 ${selectedMarker.data.name}`}
                     </h3>
                     {selectedMarker.type === 'driver' && (
-                      <p className="text-sm text-gray-600">
-                        Available Driver
-                        <br />
-                        Last updated: {new Date(selectedMarker.data.location.lastUpdated).toLocaleTimeString()}
-                      </p>
+                      <div className="text-sm text-gray-600">
+                        <p>Status: <span className="text-green-600 font-semibold">Available</span></p>
+                        <p>Distance: {calculateDistance(
+                          userLocation.lat,
+                          userLocation.lng,
+                          parseFloat(selectedMarker.data.location?.latitude || selectedMarker.data.location?.lat),
+                          parseFloat(selectedMarker.data.location?.longitude || selectedMarker.data.location?.lng)
+                        )} km away</p>
+                        <p className="text-xs mt-1">Updated: {new Date(selectedMarker.data.location?.lastUpdated || new Date()).toLocaleTimeString()}</p>
+                        {selectedMarker.data.phone && (
+                          <p className="mt-1">📞 {selectedMarker.data.phone}</p>
+                        )}
+                      </div>
                     )}
                     {selectedMarker.type === 'garage' && (
-                      <p className="text-sm text-gray-600">Service Center</p>
+                      <div className="text-sm text-gray-600">
+                        <p className="mb-1">{selectedMarker.data.address}</p>
+                        {selectedMarker.data.rating && (
+                          <p>⭐ Rating: {selectedMarker.data.rating}/5</p>
+                        )}
+                        {selectedMarker.data.isOpen !== undefined && (
+                          <p className={selectedMarker.data.isOpen ? 'text-green-600' : 'text-red-600'}>
+                            {selectedMarker.data.isOpen ? '🟢 Open Now' : '🔴 Closed'}
+                          </p>
+                        )}
+                        <p className="mt-1">Distance: {calculateDistance(
+                          userLocation.lat,
+                          userLocation.lng,
+                          selectedMarker.data.position.lat,
+                          selectedMarker.data.position.lng
+                        )} km away</p>
+                        <a
+                          href={`https://www.google.com/maps/dir/?api=1&destination=${selectedMarker.data.position.lat},${selectedMarker.data.position.lng}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-block mt-2 text-blue-600 hover:underline"
+                        >
+                          Get Directions →
+                        </a>
+                      </div>
                     )}
                   </div>
                 </InfoWindow>
@@ -204,29 +388,54 @@ const LiveMap = () => {
           </LoadScript>
         </motion.div>
 
-        {/* Legend */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="mt-6 glass p-6 rounded-xl"
-        >
-          <h3 className="text-xl font-bold mb-4 dark:text-white">Map Legend</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-6 h-6 rounded-full bg-blue-500"></div>
-              <span className="dark:text-white">Your Location</span>
+        {/* Garage List */}
+        {nearbyGarages.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="mt-6 glass p-6 rounded-xl"
+          >
+            <h3 className="text-xl font-bold mb-4 dark:text-white flex items-center gap-2">
+              <Wrench className="w-6 h-6" />
+              Nearby Service Centers ({nearbyGarages.length})
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {nearbyGarages.map((garage) => (
+                <div key={garage.id} className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow">
+                  <h4 className="font-semibold text-lg dark:text-white mb-2">{garage.name}</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{garage.address}</p>
+                  {garage.rating && (
+                    <p className="text-sm mb-2">⭐ {garage.rating}/5</p>
+                  )}
+                  <p className="text-sm mb-2">
+                    📍 {calculateDistance(
+                      userLocation.lat,
+                      userLocation.lng,
+                      garage.position.lat,
+                      garage.position.lng
+                    )} km away
+                  </p>
+                  {garage.isOpen !== undefined && (
+                    <span className={`inline-block px-2 py-1 rounded text-xs ${
+                      garage.isOpen ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                      {garage.isOpen ? '🟢 Open' : '🔴 Closed'}
+                    </span>
+                  )}
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${garage.position.lat},${garage.position.lng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block mt-3 text-center px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm transition-all"
+                  >
+                    Get Directions
+                  </a>
+                </div>
+              ))}
             </div>
-            <div className="flex items-center gap-3">
-              <div className="w-6 h-6 rounded-full bg-green-500"></div>
-              <span className="dark:text-white">Available Drivers ({drivers.length})</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-6 h-6 rounded-full bg-red-500"></div>
-              <span className="dark:text-white">Service Centers ({garages.length})</span>
-            </div>
-          </div>
-        </motion.div>
+          </motion.div>
+        )}
       </div>
     </div>
   );

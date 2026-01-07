@@ -1,16 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Calendar, Shield, ArrowLeft, MessageCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
-import { motion } from 'framer-motion';
 
 const CarDetails = () => {
   const { id } = useParams();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [car, setCar] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isOwner, setIsOwner] = useState(false);
   const [bookingData, setBookingData] = useState({
     startDate: '',
     endDate: '',
@@ -25,12 +26,15 @@ const CarDetails = () => {
     try {
       const response = await api.get(`/cars/${id}`);
       setCar(response.data.car);
+      if (user && response.data.car.owner._id === user.id) {
+        setIsOwner(true);
+      }
     } catch {
       toast.error('Failed to fetch car details');
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, user]);
 
   useEffect(() => {
     fetchCarDetails();
@@ -212,7 +216,7 @@ const CarDetails = () => {
                     <span className="font-bold dark:text-white">৳{car.rentalRates.daily}</span>
                   </div>
                 </div>
-                {car.status === 'available' && (
+                {car.status === 'available' && !isOwner && (
                   <button
                     onClick={() => setShowBookingModal(true)}
                     className="w-full mt-4 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center justify-center gap-2 transition-all"
@@ -220,6 +224,11 @@ const CarDetails = () => {
                     <Calendar className="w-4 h-4" />
                     Book Now
                   </button>
+                )}
+                {isOwner && (
+                  <div className="w-full mt-4 px-4 py-2 bg-gray-300 dark:bg-gray-600 rounded-lg text-center text-gray-600 dark:text-gray-300 font-semibold">
+                    You are the owner
+                  </div>
                 )}
               </div>
             )}

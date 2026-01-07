@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
-import { LogOut, User, MapPin, Briefcase, MessageCircle, ShoppingCart, Car } from 'lucide-react';
+import { LogOut, User, MapPin, Briefcase, MessageCircle, ShoppingCart, Car, MessageSquare } from 'lucide-react';
+import { motion } from 'framer-motion';
 import api from '../utils/api';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificationBell from '../components/Notifications/NotificationBell';
 
 const Dashboard = () => {
-  const { user, logout, isAdmin, isDriver, isOwner } = useAuth();
+  const { user, logout, logoutAll, isAdmin, isDriver, isOwner } = useAuth();
   const [stats, setStats] = useState({
     jobs: 0,
     bookings: 0,
@@ -40,19 +41,25 @@ const Dashboard = () => {
         { icon: <User />, title: 'Manage Users', link: '/admin', color: 'bg-blue-500' },
         { icon: <Briefcase />, title: 'Review Jobs', link: '/admin/jobs', color: 'bg-purple-500' },
         { icon: <MessageCircle />, title: 'Forum Posts', link: '/admin/forum', color: 'bg-green-500' },
+        { icon: <ShoppingCart />, title: 'Marketplace', link: '/marketplace', color: 'bg-indigo-500' },
       ]
     : isDriver
     ? [
         { icon: <Briefcase />, title: 'Find Jobs', link: '/jobs', color: 'bg-blue-500' },
-        { icon: <User />, title: 'My Applications', link: '/jobs/applications', color: 'bg-purple-500' },
-        { icon: <MessageCircle />, title: 'Forum', link: '/forum', color: 'bg-green-500' },
+        { icon: <User />, title: 'My Applications', link: '/jobs/my-applications', color: 'bg-purple-500' },
+        { icon: <MessageCircle />, title: 'Messages', link: '/messages', color: 'bg-green-500' },
+        { icon: <MessageSquare />, title: 'Forum', link: '/forum', color: 'bg-cyan-500' },
         { icon: <MapPin />, title: 'Service Centers', link: '/map', color: 'bg-red-500' },
+        { icon: <ShoppingCart />, title: 'Marketplace', link: '/marketplace', color: 'bg-indigo-500' },
       ]
     : [
         { icon: <Car />, title: 'My Cars', link: '/cars', color: 'bg-blue-500' },
         { icon: <Briefcase />, title: 'Post Job', link: '/jobs/create', color: 'bg-purple-500' },
-        { icon: <ShoppingCart />, title: 'Marketplace', link: '/marketplace', color: 'bg-green-500' },
-        { icon: <MessageCircle />, title: 'Forum', link: '/forum', color: 'bg-orange-500' },
+        { icon: <User />, title: 'My Jobs', link: '/jobs/my-posted', color: 'bg-green-500' },
+        { icon: <MessageCircle />, title: 'Messages', link: '/messages', color: 'bg-orange-500' },
+        { icon: <MessageSquare />, title: 'Forum', link: '/forum', color: 'bg-cyan-500' },
+        { icon: <MapPin />, title: 'Find Drivers', link: '/map', color: 'bg-red-500' },
+        { icon: <ShoppingCart />, title: 'Marketplace', link: '/marketplace', color: 'bg-indigo-500' },
       ];
 
   return (
@@ -76,6 +83,14 @@ const Dashboard = () => {
             >
               <LogOut className="w-4 h-4" />
               Logout
+            </button>
+            <button
+              onClick={logoutAll}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-lg flex items-center gap-2 transition-all"
+              title="Logout from all devices"
+            >
+              <LogOut className="w-4 h-4" />
+              Logout Everywhere
             </button>
           </div>
         </div>

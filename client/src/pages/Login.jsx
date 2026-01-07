@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Mail, Lock, Eye, EyeOff, LogIn, Shield } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [remember, setRemember] = useState(false);
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -15,7 +17,7 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
 
-    const result = await login(email, password);
+    const result = await login(email, password, remember);
     
     if (result.success) {
       if (result.user.role === 'admin') {
@@ -96,6 +98,19 @@ const Login = () => {
             </div>
 
             {/* Submit Button */}
+            <div className="flex items-center gap-2">
+              <input
+                id="remember"
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+                className="w-4 h-4"
+              />
+              <label htmlFor="remember" className="text-sm text-gray-600 dark:text-gray-300">
+                Remember me (keep me signed in)
+              </label>
+            </div>
+
             <button
               type="submit"
               disabled={loading}

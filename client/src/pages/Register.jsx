@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Mail, Lock, User, Eye, EyeOff, UserPlus } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const Register = () => {
   const [searchParams] = useSearchParams();
@@ -14,6 +15,7 @@ const Register = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [remember, setRemember] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
 
@@ -32,7 +34,7 @@ const Register = () => {
     setLoading(true);
 
     const { confirmPassword: _confirmPassword, ...registerData } = formData;
-    const result = await register(registerData);
+    const result = await register(registerData, remember);
     
     if (result.success) {
       navigate('/dashboard');
@@ -162,6 +164,19 @@ const Register = () => {
             </div>
 
             {/* Submit Button */}
+            <div className="flex items-center gap-2">
+              <input
+                id="rememberReg"
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+                className="w-4 h-4"
+              />
+              <label htmlFor="rememberReg" className="text-sm text-gray-600 dark:text-gray-300">
+                Remember me (keep me signed in)
+              </label>
+            </div>
+
             <button
               type="submit"
               disabled={loading}

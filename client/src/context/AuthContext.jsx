@@ -16,7 +16,7 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [token, setToken] = useState(localStorage.getItem('token'));
+  const [token, setToken] = useState(sessionStorage.getItem('token') || localStorage.getItem('token'));
 
   const fetchUser = useCallback(async () => {
     try {
@@ -24,9 +24,12 @@ export const AuthProvider = ({ children }) => {
       setUser(response.data.user);
     } catch (error) {
       console.error('Fetch user error:', error);
-      // Don't logout on initial load if backend is down
+      // Clear invalid token
       if (error.response?.status === 401) {
-        logout();
+        sessionStorage.removeItem('token');
+        localStorage.removeItem('token');
+        setToken(null);
+        setUser(null);
       }
     } finally {
       setLoading(false);
@@ -41,12 +44,22 @@ export const AuthProvider = ({ children }) => {
     }
   }, [token, fetchUser]);
 
-  const login = async (email, password) => {
+  const login = async (email, password, remember = false) => {
     try {
       const response = await api.post('/auth/login', { email, password });
-      const { token, user } = response.data;
+      const { token, user, requires2FA } = response.data;
       
-      localStorage.setItem('token', token);
+      if (requires2FA) {
+        // Do not set token/user yet; caller should trigger OTP verification
+        toast.success('OTP sent. Please verify to continue.');
+        return { success: true, requires2FA: true, user };
+      }
+
+      if (remember) {
+        localStorage.setItem('token', token);
+      } else {
+        sessionStorage.setItem('token', token);
+      }
       setToken(token);
       setUser(user);
       
@@ -59,12 +72,16 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (userData) => {
+  const register = async (userData, remember = false) => {
     try {
       const response = await api.post('/auth/register', userData);
       const { token, user } = response.data;
       
-      localStorage.setItem('token', token);
+      if (remember) {
+        localStorage.setItem('token', token);
+      } else {
+        sessionStorage.setItem('token', token);
+      }
       setToken(token);
       setUser(user);
       
@@ -78,12 +95,34 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
+    sessionStorage.removeItem('token');
     setToken(null);
     setUser(null);
     toast.success('Logged out successfully');
   };
 
+  const logoutAll = async () => {
+    try {
+      await api.post('/auth/logout-all');
+    } catch (_) {
+      // ignore server errors; we'll still clear client tokens
+    }
+    sessionStorage.removeItem('token');
+    localStorage.removeItem('token');
+    setToken(null);
+    setUser(null);
+    toast.success('Logged out from all devices');
+  };
+
+  const completeLogin = (token, user, remember = false) => {
+    if (remember) {
+      localStorage.setItem('token', token);
+    } else {
+      sessionStorage.setItem('token', token);
+    }
+    setToken(token);
+    setUser(user);
+  };
   const updateUser = (updatedData) => {
     setUser((prev) => ({ ...prev, ...updatedData }));
   };
@@ -97,7 +136,9 @@ export const AuthProvider = ({ children }) => {
     loading,
     login,
     register,
+    completeLogin,
     logout,
+    logoutAll,
     updateUser,
     isAdmin,
     isDriver,

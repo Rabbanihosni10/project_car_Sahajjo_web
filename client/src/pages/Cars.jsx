@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Car as CarIcon, Search, Filter, Plus } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
-import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 
 const Cars = () => {
@@ -21,24 +21,29 @@ const Cars = () => {
     isForRent: '',
   });
   const [showFilters, setShowFilters] = useState(false);
+  const [ownerView, setOwnerView] = useState(true);
 
   const fetchCarsMemo = useCallback(async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams();
-      Object.keys(filters).forEach(key => {
-        if (filters[key]) params.append(key, filters[key]);
-      });
-
-      const response = await api.get(`/cars?${params.toString()}`);
-      setCars(response.data.cars);
+      if (isOwner && ownerView) {
+        const response = await api.get('/cars/my/cars');
+        setCars(response.data.cars);
+      } else {
+        const params = new URLSearchParams();
+        Object.keys(filters).forEach(key => {
+          if (filters[key]) params.append(key, filters[key]);
+        });
+        const response = await api.get(`/cars?${params.toString()}`);
+        setCars(response.data.cars);
+      }
     } catch (error) {
       toast.error('Failed to fetch cars');
       console.error(error);
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, isOwner, ownerView]);
 
   useEffect(() => {
     fetchCarsMemo();
@@ -62,13 +67,22 @@ const Cars = () => {
             🚗 Car Sahajjo
           </Link>
           {isOwner && (
-            <Link
-              to="/cars/add"
-              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-2 transition-all"
-            >
-              <Plus className="w-4 h-4" />
-              Add Car
-            </Link>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setOwnerView(!ownerView)}
+                className={`px-4 py-2 rounded-lg border transition-all ${ownerView ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-800' : 'bg-gray-100 dark:bg-gray-700'}`}
+              >
+                {ownerView ? 'Showing: My Cars' : 'Showing: All Cars'}
+              </button>
+              <Link
+                to="/cars/add"
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-2 transition-all"
+              >
+                <Plus className="w-4 h-4" />
+                Add Car
+              </Link>
+            </div>
           )}
         </div>
       </nav>

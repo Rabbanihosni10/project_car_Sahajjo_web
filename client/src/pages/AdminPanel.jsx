@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { Trash2, CheckCircle, XCircle, Undo, Users, LogOut } from 'lucide-react';
+import { motion } from 'framer-motion';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
 
@@ -10,6 +11,10 @@ const AdminPanel = () => {
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [pendingPosts, setPendingPosts] = useState([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+  const [rejectedPosts, setRejectedPosts] = useState([]);
+  const [loadingRejected, setLoadingRejected] = useState(false);
 
   useEffect(() => {
     if (!isAdmin) {
@@ -17,6 +22,8 @@ const AdminPanel = () => {
       return;
     }
     fetchUsers();
+    fetchPendingPosts();
+    fetchRejectedPosts();
   }, [isAdmin, navigate]);
 
   const fetchUsers = async () => {
@@ -29,6 +36,32 @@ const AdminPanel = () => {
       console.error(error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPendingPosts = async () => {
+    setLoadingPosts(true);
+    try {
+      const response = await api.get('/forum/pending');
+      setPendingPosts(response.data.posts || []);
+    } catch (error) {
+      toast.error('Failed to fetch pending posts');
+      console.error(error);
+    } finally {
+      setLoadingPosts(false);
+    }
+  };
+
+  const fetchRejectedPosts = async () => {
+    setLoadingRejected(true);
+    try {
+      const response = await api.get('/forum/rejected');
+      setRejectedPosts(response.data.posts || []);
+    } catch (error) {
+      toast.error('Failed to fetch rejected posts');
+      console.error(error);
+    } finally {
+      setLoadingRejected(false);
     }
   };
 
@@ -58,6 +91,42 @@ const AdminPanel = () => {
       );
     } catch (error) {
       toast.error('Failed to delete user');
+      console.error(error);
+    }
+  };
+
+  const handleApprovePost = async (postId) => {
+    try {
+      await api.put(`/forum/${postId}/approve`);
+      toast.success('Post approved');
+      setPendingPosts((prev) => prev.filter((p) => p._id !== postId));
+      setRejectedPosts((prev) => prev.filter((p) => p._id !== postId));
+    } catch (error) {
+      toast.error('Failed to approve post');
+      console.error(error);
+    }
+  };
+
+  const handleRejectPost = async (postId) => {
+    if (!confirm('Reject this post?')) return;
+    try {
+      await api.put(`/forum/${postId}/reject`);
+      toast.success('Post rejected');
+      setPendingPosts((prev) => prev.filter((p) => p._id !== postId));
+    } catch (error) {
+      toast.error('Failed to reject post');
+      console.error(error);
+    }
+  };
+
+  const handleRestorePost = async (postId) => {
+    try {
+      await api.put(`/forum/${postId}/restore`);
+      toast.success('Post restored to pending');
+      setRejectedPosts((prev) => prev.filter((p) => p._id !== postId));
+      fetchPendingPosts();
+    } catch (error) {
+      toast.error('Failed to restore post');
       console.error(error);
     }
   };
@@ -263,6 +332,130 @@ const AdminPanel = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        </motion.div>
+
+        {/* Forum Moderation */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+          className="glass rounded-xl mt-12"
+        >
+          <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-semibold dark:text-white">Forum Moderation</h2>
+              <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">Pending: {pendingPosts.length}</span>
+              <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">Rejected: {rejectedPosts.length}</span>
+            </div>
+            <button
+              onClick={() => { fetchPendingPosts(); fetchRejectedPosts(); }}
+              className="px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg"
+            >
+              Refresh
+            </button>
+          </div>
+          <div className="p-6">
+            {loadingPosts ? (
+              <div className="flex items-center justify-center py-10">
+                <div className="animate-spin rounded-full h-10 w-10 border-t-4 border-b-4 border-blue-500"></div>
+              </div>
+            ) : pendingPosts.length === 0 ? (
+              <p className="text-gray-600 dark:text-gray-300">No pending posts to moderate.</p>
+            ) : (
+              <div className="space-y-4">
+                {pendingPosts.map((post) => (
+                  <div key={post._id} className="glass p-4 rounded-lg">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800 capitalize">
+                            {post.category}
+                          </span>
+                          <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">
+                            {post.visibility}
+                          </span>
+                        </div>
+                        <h3 className="text-xl font-semibold dark:text-white">{post.title}</h3>
+                        <p className="text-gray-700 dark:text-gray-300 mt-1">{post.content}</p>
+                        <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                          By {post.author?.name} ({post.author?.role})
+                        </div>
+                        {post.images?.length > 0 && (
+                          <div className="mt-3 flex gap-2 flex-wrap">
+                            {post.images.slice(0, 3).map((img, idx) => (
+                              <img key={idx} src={img} alt="post" className="w-20 h-20 object-cover rounded" />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleApprovePost(post._id)}
+                          className="px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg flex items-center gap-2"
+                        >
+                          <CheckCircle className="w-4 h-4" /> Approve
+                        </button>
+                        <button
+                          onClick={() => handleRejectPost(post._id)}
+                          className="px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center gap-2"
+                        >
+                          <XCircle className="w-4 h-4" /> Reject
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="mt-10">
+              <h3 className="text-xl font-semibold dark:text-white mb-4">Rejected Posts</h3>
+              {loadingRejected ? (
+                <div className="flex items-center justify-center py-6">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-4 border-b-4 border-red-500"></div>
+                </div>
+              ) : rejectedPosts.length === 0 ? (
+                <p className="text-gray-600 dark:text-gray-300">No rejected posts.</p>
+              ) : (
+                <div className="space-y-4">
+                  {rejectedPosts.map((post) => (
+                    <div key={post._id} className="glass p-4 rounded-lg">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800 capitalize">
+                              {post.category}
+                            </span>
+                            <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">
+                              Rejected
+                            </span>
+                          </div>
+                          <h3 className="text-xl font-semibold dark:text-white">{post.title}</h3>
+                          <p className="text-gray-700 dark:text-gray-300 mt-1">{post.content}</p>
+                          <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                            By {post.author?.name} ({post.author?.role})
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleRestorePost(post._id)}
+                            className="px-3 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg flex items-center gap-2"
+                          >
+                            <Undo className="w-4 h-4" /> Restore
+                          </button>
+                          <button
+                            onClick={() => handleApprovePost(post._id)}
+                            className="px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg flex items-center gap-2"
+                          >
+                            <CheckCircle className="w-4 h-4" /> Approve
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </motion.div>
       </div>
