@@ -6,23 +6,30 @@ const bookingSchema = new mongoose.Schema({
     ref: 'Car',
     required: true,
   },
+  owner: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+  },
   renter: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
   },
+  bookingType: {
+    type: String,
+    enum: ['rent', 'buy'],
+    required: true,
+  },
   startDate: {
     type: Date,
-    required: true,
   },
   endDate: {
     type: Date,
-    required: true,
   },
   rateType: {
     type: String,
-    enum: ['hourly', 'daily'],
-    required: true,
+    enum: ['hourly', 'daily', 'one-time'],
   },
   totalAmount: {
     type: Number,
@@ -34,7 +41,7 @@ const bookingSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'confirmed', 'active', 'completed', 'cancelled'],
+    enum: ['pending', 'approved', 'rejected', 'active', 'completed', 'cancelled'],
     default: 'pending',
   },
   paymentStatus: {
@@ -45,6 +52,11 @@ const bookingSchema = new mongoose.Schema({
   pickupLocation: String,
   dropLocation: String,
   notes: String,
+  driverMessage: String,
+  ownerResponse: String,
+  approvedAt: Date,
+  rejectedAt: Date,
+  rejectionReason: String,
   createdAt: {
     type: Date,
     default: Date.now,

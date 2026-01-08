@@ -23,8 +23,10 @@ exports.createNotification = async (req, res) => {
 // @access  Private
 exports.getMyNotifications = async (req, res) => {
   try {
-    const { unread } = req.query;
+    const { unread, limit } = req.query;
     let query = { user: req.user.id };
+
+    const limitValue = Math.min(Number(limit) || 50, 100);
 
     if (unread === 'true') {
       query.isRead = false;
@@ -32,7 +34,7 @@ exports.getMyNotifications = async (req, res) => {
 
     const notifications = await Notification.find(query)
       .sort({ createdAt: -1 })
-      .limit(50);
+      .limit(limitValue);
 
     res.json({ success: true, count: notifications.length, notifications });
   } catch (error) {

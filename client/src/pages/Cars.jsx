@@ -280,18 +280,39 @@ const Cars = () => {
                     </div>
                   )}
 
-                  <Link
-                    to={`/cars/${car._id}`}
-                    className="block w-full text-center px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all"
-                  >
-                    View Details
-                  </Link>
+                  <div className="flex gap-2">
+                    <Link
+                      to={`/cars/${car._id}`}
+                      className="flex-1 text-center px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all"
+                    >
+                      View Details
+                    </Link>
+                    {isDriver && car.status === 'available' && (
+                      <button
+                        onClick={() => handleRequestBooking(car)}
+                        className="flex-1 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-all flex items-center justify-center gap-2"
+                      >
+                        <Send size={16} />
+                        Request
+                      </button>
+                    )}
+                  </div>
                 </div>
               </motion.div>
             ))}
           </div>
         )}
       </div>
+
+      <BookingRequestModal
+        isOpen={bookingModalOpen}
+        onClose={() => {
+          setBookingModalOpen(false);
+          setSelectedCar(null);
+        }}
+        car={selectedCar}
+        onSuccess={fetchCarsMemo}
+      />
     </div>
   );
 };

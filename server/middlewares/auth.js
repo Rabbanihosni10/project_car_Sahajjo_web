@@ -28,6 +28,11 @@ exports.protect = async (req, res, next) => {
       return res.status(401).json({ message: 'User not found' });
     }
 
+    // Validate tokenVersion to support logout-all
+    if (typeof decoded.tokenVersion !== 'undefined' && decoded.tokenVersion !== (req.user.tokenVersion || 0)) {
+      return res.status(401).json({ message: 'Not authorized, token invalidated' });
+    }
+
     next();
   } catch (error) {
     console.error('Auth Middleware Error:', error);
@@ -53,6 +58,14 @@ exports.checkApproval = (req, res, next) => {
     return res.status(403).json({
       message: 'Your account is pending admin approval',
     });
+  }
+  next();
+};
+
+// Admin-only guard
+exports.admin = (req, res, next) => {
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Admin access only' });
   }
   next();
 };

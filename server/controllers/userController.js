@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const { sendNotification } = require('./notificationController');
 
 // @desc    Get all users (Admin only)
 // @route   GET /api/users
@@ -118,6 +119,20 @@ exports.approveUser = async (req, res) => {
     }
 
     await user.save();
+
+    if (typeof isApproved !== 'undefined') {
+      const approvalMessage = isApproved
+        ? 'Your account has been approved. You can now access all features.'
+        : 'Your account approval has been revoked. Please contact support if this is unexpected.';
+      await sendNotification(user._id, 'Account Status Update', approvalMessage, 'user', user._id, 'User');
+    }
+
+    if (kycStatus) {
+      const kycMessage = kycStatus === 'approved'
+        ? 'Your KYC documents have been verified.'
+        : `Your KYC status was updated to ${kycStatus}.`;
+      await sendNotification(user._id, 'KYC Update', kycMessage, 'user', user._id, 'User');
+    }
 
     res.json({
       success: true,

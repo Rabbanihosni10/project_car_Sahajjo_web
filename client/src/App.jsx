@@ -17,14 +17,26 @@ import AddCar from './pages/AddCar';
 import CreateJob from './pages/CreateJob';
 import MyApplications from './pages/MyApplications';
 import Marketplace from './pages/Marketplace';
+import ProductDetails from './pages/ProductDetails';
 import Cart from './pages/Cart';
+import MyOrders from './pages/MyOrders';
+import OrderHistory from './pages/OrderHistory';
 import Jobs from './pages/Jobs';
+import JobDetails from './pages/JobDetails';
 import Forum from './pages/Forum';
 import MyJobs from './pages/MyJobs';
 import Messages from './pages/Messages';
 import Conversations from './pages/Conversations';
 import UserProfile from './pages/UserProfile';
-import LiveMap from './components/Map/LiveMap';
+import LeafletMap from './components/Map/LeafletMap';
+import AboutUs from './pages/AboutUs';
+import ContactUs from './pages/ContactUs';
+import AiChat from './pages/AiChat';
+import AiTranslate from './pages/AiTranslate';
+import SubmitGarage from './pages/SubmitGarage';
+import ManageGarages from './pages/ManageGarages';
+import MyBookings from './pages/MyBookings';
+import BookingRequests from './pages/BookingRequests';
 
 function App() {
   return (
@@ -60,6 +72,8 @@ function App() {
             <Routes>
               {/* Public Routes */}
               <Route path="/" element={<Home />} />
+              <Route path="/about" element={<AboutUs />} />
+              <Route path="/contact" element={<ContactUs />} />
               <Route path="/login" element={<Login />} />
               <Route path="/admin-login" element={<AdminLogin />} />
               <Route path="/register" element={<Register />} />
@@ -110,8 +124,59 @@ function App() {
               }
             />
             <Route
+              path="/products/:id"
+              element={
+                <ProtectedRoute>
+                  <ProductDetails />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/cart"
               element={<Cart />}
+            />
+            <Route
+              path="/my-orders"
+              element={
+                <ProtectedRoute>
+                  <MyOrders />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/order-history"
+              element={
+                <ProtectedRoute>
+                  <OrderHistory />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Booking Routes */}
+            <Route
+              path="/bookings/my"
+              element={
+                <ProtectedRoute>
+                  <MyBookings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/bookings/requests"
+              element={
+                <ProtectedRoute>
+                  <BookingRequests />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/orders/:id"
+              element={
+                <ProtectedRoute>
+                  <OrderHistory />
+                </ProtectedRoute>
+              }
             />
             
             {/* Jobs Routes */}
@@ -128,6 +193,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <CreateJob />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/jobs/:id"
+              element={
+                <ProtectedRoute>
+                  <JobDetails />
                 </ProtectedRoute>
               }
             />
@@ -164,6 +237,22 @@ function App() {
               }
             />
             <Route
+              path="/assistant/chat"
+              element={
+                <ProtectedRoute>
+                  <AiChat />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/assistant/translate"
+              element={
+                <ProtectedRoute>
+                  <AiTranslate />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/users/:userId"
               element={
                 <ProtectedRoute>
@@ -186,7 +275,25 @@ function App() {
               path="/map"
               element={
                 <ProtectedRoute>
-                  <LiveMap />
+                  <LeafletMap />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/submit-garage"
+              element={
+                <ProtectedRoute>
+                  <SubmitGarage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/admin/garages"
+              element={
+                <ProtectedRoute adminOnly={true}>
+                  <ManageGarages />
                 </ProtectedRoute>
               }
             />
@@ -212,4 +319,5 @@ function App() {
 }
 
 export default App;
+
 

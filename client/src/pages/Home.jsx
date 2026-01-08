@@ -50,7 +50,19 @@ const Home = () => {
           >
             🚗 Car Sahajjo
           </motion.div>
-          <div className="flex gap-4">
+          <div className="flex items-center gap-6">
+            <Link
+              to="/about"
+              className="text-gray-700 dark:text-white hover:text-blue-500 dark:hover:text-blue-400 transition-all"
+            >
+              About Us
+            </Link>
+            <Link
+              to="/contact"
+              className="text-gray-700 dark:text-white hover:text-blue-500 dark:hover:text-blue-400 transition-all"
+            >
+              Contact
+            </Link>
             <Link
               to="/login"
               className="px-6 py-2 text-gray-700 dark:text-white hover:bg-white/10 rounded-lg transition-all"
@@ -167,7 +179,21 @@ const Home = () => {
       {/* Footer */}
       <footer className="py-8 px-6 bg-gray-900 text-white">
         <div className="container mx-auto text-center">
-          <p>© 2025 Car Sahajjo. All rights reserved.</p>
+          <p className="mb-4">© 2026 Car Sahajjo. All rights reserved.</p>
+          <div className="flex justify-center gap-6">
+            <Link to="/about" className="hover:text-blue-400 transition-all">
+              About Us
+            </Link>
+            <Link to="/contact" className="hover:text-blue-400 transition-all">
+              Contact Us
+            </Link>
+            <Link to="/login" className="hover:text-blue-400 transition-all">
+              Login
+            </Link>
+            <Link to="/register" className="hover:text-blue-400 transition-all">
+              Sign Up
+            </Link>
+          </div>
         </div>
       </footer>
     </div>

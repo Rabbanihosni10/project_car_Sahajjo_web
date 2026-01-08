@@ -5,14 +5,23 @@ const Car = require('../models/Car');
 // @access  Private (Owner only)
 exports.createCar = async (req, res) => {
   try {
+    // Admins cannot create cars
+    if (req.user.role === 'admin') {
+      return res.status(403).json({ message: 'Admins cannot create cars' });
+    }
+    console.log('Creating car for user:', req.user._id);
+    
     const carData = {
       ...req.body,
-      owner: req.user.id,
+      owner: req.user._id,
     };
 
     const car = await Car.create(carData);
-    res.status(201).json({ success: true, car });
+    console.log('Car created successfully:', car._id);
+    
+    res.status(201).json({ success: true, message: 'Car added successfully', car });
   } catch (error) {
+    console.error('Create Car Error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
@@ -96,7 +105,7 @@ exports.updateCar = async (req, res) => {
     }
 
     // Check ownership
-    if (car.owner.toString() !== req.user.id && req.user.role !== 'admin') {
+    if (car.owner.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized to update this car' });
     }
 
@@ -123,7 +132,7 @@ exports.deleteCar = async (req, res) => {
     }
 
     // Check ownership
-    if (car.owner.toString() !== req.user.id && req.user.role !== 'admin') {
+    if (car.owner.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized to delete this car' });
     }
 
@@ -140,7 +149,7 @@ exports.deleteCar = async (req, res) => {
 // @access  Private (Owner only)
 exports.getMyCars = async (req, res) => {
   try {
-    const cars = await Car.find({ owner: req.user.id }).sort({ createdAt: -1 });
+    const cars = await Car.find({ owner: req.user._id }).sort({ createdAt: -1 });
     res.json({ success: true, count: cars.length, cars });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -158,7 +167,7 @@ exports.updateCarDocuments = async (req, res) => {
       return res.status(404).json({ message: 'Car not found' });
     }
 
-    if (car.owner.toString() !== req.user.id) {
+    if (car.owner.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not authorized' });
     }
 

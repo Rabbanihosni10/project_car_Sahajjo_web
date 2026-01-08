@@ -1,11 +1,17 @@
 const Booking = require('../models/Booking');
 const Car = require('../models/Car');
+const { sendNotification } = require('./notificationController');
 
 // @desc    Create a new booking
 // @route   POST /api/bookings
 // @access  Private
 exports.createBooking = async (req, res) => {
   try {
+    // Admins cannot book cars
+    if (req.user.role === 'admin') {
+      return res.status(403).json({ message: 'Admins cannot book cars' });
+    }
+
     const { car, startDate, endDate, rateType, pickupLocation, dropLocation, notes } = req.body;
 
     // Check if car exists and is available
@@ -46,7 +52,7 @@ exports.createBooking = async (req, res) => {
 
     const booking = await Booking.create({
       car,
-      renter: req.user.id,
+      renter: req.user._id,
       startDate,
       endDate,
       rateType,
@@ -58,6 +64,16 @@ exports.createBooking = async (req, res) => {
     });
 
     await booking.populate('car renter');
+
+    // Notify car owner about new booking
+    await sendNotification(
+      carData.owner,
+      'New Booking Request',
+      `${req.user.name} has requested to book your ${carData.brand} ${carData.model}`,
+      'booking',
+      booking._id,
+      'Booking'
+    );
 
     res.status(201).json({ success: true, booking });
   } catch (error) {
@@ -105,7 +121,7 @@ exports.getBookingById = async (req, res) => {
 // @access  Private
 exports.getMyBookings = async (req, res) => {
   try {
-    const bookings = await Booking.find({ renter: req.user.id })
+    const bookings = await Booking.find({ renter: req.user._id })
       .populate('car', 'brand model year images')
       .sort({ createdAt: -1 });
 
@@ -121,7 +137,7 @@ exports.getMyBookings = async (req, res) => {
 exports.getReceivedBookings = async (req, res) => {
   try {
     const Car = require('../models/Car');
-    const myCars = await Car.find({ owner: req.user.id });
+    const myCars = await Car.find({ owner: req.user._id });
     const carIds = myCars.map(car => car._id);
 
     const bookings = await Booking.find({ car: { $in: carIds } })
@@ -148,8 +164,8 @@ exports.updateBookingStatus = async (req, res) => {
     }
 
     // Check authorization
-    const isOwner = booking.car.owner.toString() === req.user.id;
-    const isRenter = booking.renter.toString() === req.user.id;
+    const isOwner = booking.car.owner.toString() === req.user._id.toString();
+    const isRenter = booking.renter.toString() === req.user._id.toString();
 
     if (!isOwner && !isRenter && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized' });
@@ -163,6 +179,26 @@ exports.updateBookingStatus = async (req, res) => {
       await Car.findByIdAndUpdate(booking.car._id, { status: 'rented' });
     } else if (status === 'completed' || status === 'cancelled') {
       await Car.findByIdAndUpdate(booking.car._id, { status: 'available' });
+    }
+
+    // Notify renter about booking status change
+    const statusMessages = {
+      confirmed: 'Your booking has been confirmed!',
+      active: 'Your booking is now active!',
+      completed: 'Your booking has been completed!',
+      cancelled: 'Your booking has been cancelled',
+      rejected: 'Your booking has been rejected'
+    };
+    
+    if (statusMessages[status]) {
+      await sendNotification(
+        booking.renter,
+        'Booking Status Updated',
+        statusMessages[status],
+        'booking',
+        booking._id,
+        'Booking'
+      );
     }
 
     res.json({ success: true, booking });
@@ -182,7 +218,7 @@ exports.cancelBooking = async (req, res) => {
       return res.status(404).json({ message: 'Booking not found' });
     }
 
-    if (booking.renter.toString() !== req.user.id && req.user.role !== 'admin') {
+    if (booking.renter.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
@@ -205,7 +241,7 @@ exports.checkAvailability = async (req, res) => {
 
     const bookings = await Booking.find({
       car: carId,
-      status: { $in: ['pending', 'confirmed', 'active'] },
+      status: { $in: ['pending', 'approved', 'active'] },
       $or: [
         { startDate: { $lte: new Date(endDate) }, endDate: { $gte: new Date(startDate) } },
       ],
@@ -216,6 +252,259 @@ exports.checkAvailability = async (req, res) => {
       available: bookings.length === 0,
       conflictingBookings: bookings,
     });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Request car booking (Driver)
+// @route   POST /api/bookings/request
+// @access  Private (Driver only)
+exports.requestBooking = async (req, res) => {
+  try {
+    const { carId, bookingType, startDate, endDate, rateType, driverMessage, pickupLocation, dropLocation } = req.body;
+
+    if (req.user.role !== 'driver') {
+      return res.status(403).json({ message: 'Only drivers can request bookings' });
+    }
+
+    const car = await Car.findById(carId).populate('owner');
+    if (!car) {
+      return res.status(404).json({ message: 'Car not found' });
+    }
+
+    if (car.status !== 'available') {
+      return res.status(400).json({ message: 'Car is not available for booking' });
+    }
+
+    // Calculate total amount
+    let totalAmount;
+    if (bookingType === 'buy') {
+      totalAmount = car.price;
+    } else {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const duration = (end - start) / (1000 * 60 * 60);
+
+      if (rateType === 'hourly') {
+        totalAmount = duration * car.rentalRates.hourly;
+      } else {
+        const days = Math.ceil(duration / 24);
+        totalAmount = days * car.rentalRates.daily;
+      }
+    }
+
+    const booking = await Booking.create({
+      car: carId,
+      owner: car.owner._id,
+      renter: req.user._id,
+      bookingType,
+      startDate: bookingType === 'rent' ? startDate : undefined,
+      endDate: bookingType === 'rent' ? endDate : undefined,
+      rateType: bookingType === 'rent' ? rateType : 'one-time',
+      totalAmount,
+      securityDeposit: bookingType === 'rent' ? totalAmount * 0.2 : 0,
+      pickupLocation,
+      dropLocation,
+      driverMessage,
+      status: 'pending',
+    });
+
+    await booking.populate('car renter owner');
+
+    // Notify car owner
+    await sendNotification({
+      userId: car.owner._id,
+      type: 'booking_request',
+      title: 'New Booking Request',
+      message: `${req.user.name} wants to ${bookingType} your ${car.brand} ${car.model}`,
+      link: `/bookings/requests`
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Booking request sent successfully. Waiting for owner approval.',
+      booking
+    });
+  } catch (error) {
+    console.error('Request booking error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Get booking requests for owner
+// @route   GET /api/bookings/owner/requests
+// @access  Private (Car Owner only)
+exports.getOwnerBookingRequests = async (req, res) => {
+  try {
+    const bookings = await Booking.find({
+      owner: req.user._id,
+      status: 'pending'
+    })
+      .populate('car', 'brand model year images price rentalRates listingType')
+      .populate('renter', 'name email phone')
+      .sort({ createdAt: -1 });
+
+    res.json({ success: true, count: bookings.length, bookings });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Get all bookings for owner (approved/rejected/all)
+// @route   GET /api/bookings/owner/all
+// @access  Private (Car Owner only)
+exports.getOwnerAllBookings = async (req, res) => {
+  try {
+    const { status } = req.query;
+    const query = { owner: req.user._id };
+    
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+
+    const bookings = await Booking.find(query)
+      .populate('car', 'brand model year images price rentalRates listingType')
+      .populate('renter', 'name email phone')
+      .sort({ createdAt: -1 });
+
+    const stats = {
+      total: bookings.length,
+      pending: bookings.filter(b => b.status === 'pending').length,
+      approved: bookings.filter(b => b.status === 'approved').length,
+      rejected: bookings.filter(b => b.status === 'rejected').length,
+      active: bookings.filter(b => b.status === 'active').length,
+      completed: bookings.filter(b => b.status === 'completed').length,
+      rented: bookings.filter(b => b.bookingType === 'rent' && ['approved', 'active', 'completed'].includes(b.status)).length,
+      sold: bookings.filter(b => b.bookingType === 'buy' && ['approved', 'completed'].includes(b.status)).length,
+    };
+
+    res.json({ success: true, stats, count: bookings.length, bookings });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Approve booking request
+// @route   PUT /api/bookings/:id/approve
+// @access  Private (Car Owner only)
+exports.approveBooking = async (req, res) => {
+  try {
+    const { ownerResponse } = req.body;
+
+    const booking = await Booking.findById(req.params.id)
+      .populate('car')
+      .populate('renter', 'name');
+
+    if (!booking) {
+      return res.status(404).json({ message: 'Booking not found' });
+    }
+
+    if (booking.owner.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized to approve this booking' });
+    }
+
+    if (booking.status !== 'pending') {
+      return res.status(400).json({ message: 'Booking is not in pending status' });
+    }
+
+    booking.status = 'approved';
+    booking.approvedAt = Date.now();
+    booking.ownerResponse = ownerResponse;
+    await booking.save();
+
+    // Notify driver
+    await sendNotification({
+      userId: booking.renter._id,
+      type: 'booking_approved',
+      title: 'Booking Approved!',
+      message: `Your request to ${booking.bookingType} ${booking.car.brand} ${booking.car.model} has been approved!`,
+      link: `/bookings/my`
+    });
+
+    res.json({
+      success: true,
+      message: 'Booking approved successfully',
+      booking
+    });
+  } catch (error) {
+    console.error('Approve booking error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Reject booking request
+// @route   PUT /api/bookings/:id/reject
+// @access  Private (Car Owner only)
+exports.rejectBooking = async (req, res) => {
+  try {
+    const { rejectionReason } = req.body;
+
+    if (!rejectionReason || !rejectionReason.trim()) {
+      return res.status(400).json({ message: 'Rejection reason is required' });
+    }
+
+    const booking = await Booking.findById(req.params.id)
+      .populate('car')
+      .populate('renter', 'name');
+
+    if (!booking) {
+      return res.status(404).json({ message: 'Booking not found' });
+    }
+
+    if (booking.owner.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized to reject this booking' });
+    }
+
+    if (booking.status !== 'pending') {
+      return res.status(400).json({ message: 'Booking is not in pending status' });
+    }
+
+    booking.status = 'rejected';
+    booking.rejectedAt = Date.now();
+    booking.rejectionReason = rejectionReason;
+    await booking.save();
+
+    // Notify driver
+    await sendNotification({
+      userId: booking.renter._id,
+      type: 'booking_rejected',
+      title: 'Booking Rejected',
+      message: `Your request to ${booking.bookingType} ${booking.car.brand} ${booking.car.model} was rejected: ${rejectionReason}`,
+      link: `/bookings/my`
+    });
+
+    res.json({
+      success: true,
+      message: 'Booking rejected',
+      booking
+    });
+  } catch (error) {
+    console.error('Reject booking error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Get driver's bookings
+// @route   GET /api/bookings/driver/my
+// @access  Private (Driver only)
+exports.getDriverBookings = async (req, res) => {
+  try {
+    const bookings = await Booking.find({ renter: req.user._id })
+      .populate('car', 'brand model year images price rentalRates listingType')
+      .populate('owner', 'name email phone')
+      .sort({ createdAt: -1 });
+
+    const stats = {
+      total: bookings.length,
+      pending: bookings.filter(b => b.status === 'pending').length,
+      approved: bookings.filter(b => b.status === 'approved').length,
+      rejected: bookings.filter(b => b.status === 'rejected').length,
+      active: bookings.filter(b => b.status === 'active').length,
+      completed: bookings.filter(b => b.status === 'completed').length,
+    };
+
+    res.json({ success: true, stats, count: bookings.length, bookings });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }

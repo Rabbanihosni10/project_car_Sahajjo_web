@@ -19,21 +19,21 @@ const Messages = () => {
   const fetchConversation = useCallback(async () => {
     try {
       setLoading(true);
+      
+      // Fetch the other user's details first
+      const userResponse = await api.get(`/users/${userId}`);
+      setOtherUser(userResponse.data.user || userResponse.data);
+      
+      // Then fetch messages
       const response = await api.get(`/messages/conversation/${userId}`);
       setMessages(response.data.messages || []);
-      
-      if (response.data.messages && response.data.messages.length > 0) {
-        const firstMsg = response.data.messages[0];
-        const other = firstMsg.sender._id === user.id ? firstMsg.receiver : firstMsg.sender;
-        setOtherUser(other);
-      }
     } catch (error) {
       toast.error('Failed to load messages');
       console.error(error);
     } finally {
       setLoading(false);
     }
-  }, [userId, user.id]);
+  }, [userId]);
 
   const markAsRead = useCallback(async () => {
     try {

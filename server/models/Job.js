@@ -31,8 +31,8 @@ const jobSchema = new mongoose.Schema({
   },
   jobType: {
     type: String,
-    enum: ['full-time', 'part-time', 'contract'],
-    default: 'full-time',
+    enum: ['fulltime', 'parttime', 'contract', 'temporary', 'full-time', 'part-time'],
+    default: 'fulltime',
   },
   status: {
     type: String,

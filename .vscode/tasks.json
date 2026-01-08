@@ -1,0 +1,10 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Remove SMTP and 2FA on login",
+			"type": "shell",
+			"command": "git --no-pager diff -- src"
+		}
+	]
+}

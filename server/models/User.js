@@ -77,6 +77,21 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  tokenVersion: {
+    type: Number,
+    default: 0,
+  },
+  twoFactorEnabled: {
+    type: Boolean,
+    default: false,
+  },
+  twoFactorCode: String,
+  twoFactorExpires: Date,
+  lastOtpSentAt: Date,
+  otpAttemptCount: {
+    type: Number,
+    default: 0,
+  },
 });
 
 // Hash password before saving

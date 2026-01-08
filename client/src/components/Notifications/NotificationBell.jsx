@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Bell } from 'lucide-react';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
+import toast from 'react-hot-toast';
 import api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 
@@ -13,9 +14,11 @@ const NotificationBell = () => {
   const fetchNotifications = useCallback(async () => {
     try {
       const response = await api.get('/notifications?limit=5');
-      setNotifications(response.data.notifications);
-    } catch {
-      console.error('Failed to fetch notifications');
+      const list = Array.isArray(response.data?.notifications) ? response.data.notifications : [];
+      setNotifications(list);
+    } catch (error) {
+      console.error('Failed to fetch notifications', error);
+      toast.error('Could not load notifications');
     }
   }, []);
 
@@ -23,8 +26,8 @@ const NotificationBell = () => {
     try {
       const response = await api.get('/notifications/unread/count');
       setUnreadCount(response.data.count);
-    } catch {
-      console.error('Failed to fetch unread count');
+    } catch (error) {
+      console.error('Failed to fetch unread count', error);
     }
   }, []);
 
@@ -44,8 +47,9 @@ const NotificationBell = () => {
       await api.put(`/notifications/${id}/read`);
       fetchNotifications();
       fetchUnreadCount();
-    } catch {
-      console.error('Failed to mark as read');
+    } catch (error) {
+      console.error('Failed to mark as read', error);
+      toast.error('Could not update notification');
     }
   };
 
@@ -54,8 +58,9 @@ const NotificationBell = () => {
       await api.put('/notifications/read-all');
       fetchNotifications();
       fetchUnreadCount();
-    } catch {
-      console.error('Failed to mark all as read');
+    } catch (error) {
+      console.error('Failed to mark all as read', error);
+      toast.error('Could not mark all as read');
     }
   };
 

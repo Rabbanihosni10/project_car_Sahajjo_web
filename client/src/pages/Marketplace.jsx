@@ -16,39 +16,12 @@ const Marketplace = () => {
     maxPrice: '',
   });
 
-  const seedProducts = useCallback(async () => {
-    try {
-      const existingRes = await api.get('/products');
-      if (existingRes.data.products.length > 0) return;
-
-      const seedData = [
-        { name: 'Oil Filter', category: 'parts', price: 500, description: 'High quality oil filter for all cars', images: ['https://images.unsplash.com/photo-1628886139465-38b09603f389?q=80&w=800&auto=format&fit=crop'] },
-        { name: 'Air Filter', category: 'parts', price: 800, description: 'Engine air filter replacement', images: ['https://images.unsplash.com/photo-1608567663783-b7c06b4be7ae?q=80&w=800&auto=format&fit=crop'] },
-        { name: 'Brake Pads', category: 'parts', price: 2500, description: 'Heavy duty brake pads', images: ['https://images.unsplash.com/photo-1566833050856-e3d2a1fdf3f7?q=80&w=800&auto=format&fit=crop'] },
-        { name: 'Car Polish', category: 'fluids', price: 1200, description: 'Premium car polish and wax', images: ['https://images.unsplash.com/photo-1598711090019-7db2619c1b79?q=80&w=800&auto=format&fit=crop'] },
-        { name: 'Car Battery', category: 'electronics', price: 8000, description: '75AH Car battery', images: ['https://images.unsplash.com/photo-1610490008888-1dfdf0b36662?q=80&w=800&auto=format&fit=crop'] },
-        { name: 'Floor Mats', category: 'accessories', price: 1500, description: 'Premium rubber floor mats', images: ['https://images.unsplash.com/photo-1525116647962-f9239742facb?q=80&w=800&auto=format&fit=crop'] },
-        { name: 'Seat Covers', category: 'accessories', price: 4000, description: 'Leather seat covers set', images: ['https://images.unsplash.com/photo-1611608811528-3fe9ba9363dd?q=80&w=800&auto=format&fit=crop'] },
-        { name: 'LED Lights', category: 'electronics', price: 2000, description: 'LED headlight upgrade kit', images: ['https://images.unsplash.com/photo-1565041524513-348817bed503?q=80&w=800&auto=format&fit=crop'] },
-        { name: 'Jumper Cables', category: 'tools', price: 800, description: 'Heavy duty jumper cables', images: ['https://images.unsplash.com/photo-1581091121526-c6e87f7f5d0d?q=80&w=800&auto=format&fit=crop'] },
-        { name: 'Car Jack', category: 'tools', price: 3000, description: '3 ton hydraulic car jack', images: ['https://images.unsplash.com/photo-1614644147720-a909bf6250cb?q=80&w=800&auto=format&fit=crop'] },
-      ];
-
-      for (const product of seedData) {
-        await api.post('/products', product);
-      }
-    } catch (error) {
-      console.log('Products already exist or error seeding');
-    }
-  }, []);
-
   useEffect(() => {
-    seedProducts();
     const savedCart = localStorage.getItem('cart');
     if (savedCart) {
       setCart(JSON.parse(savedCart));
     }
-  }, [seedProducts]);
+  }, []);
 
   const fetchProducts = useCallback(async () => {
     try {

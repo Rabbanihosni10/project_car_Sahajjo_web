@@ -26,6 +26,24 @@ const orderSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  subtotal: {
+    type: Number,
+    required: true,
+  },
+  discount: {
+    type: Number,
+    default: 0,
+  },
+  discountCode: String,
+  shipping: {
+    type: Number,
+    default: 100,
+  },
+  paymentMethod: {
+    type: String,
+    enum: ['card', 'bkash', 'nagad', 'cod'],
+    default: 'card',
+  },
   shippingAddress: {
     street: String,
     city: String,
@@ -44,6 +62,22 @@ const orderSchema = new mongoose.Schema({
     default: 'pending',
   },
   transactionId: String,
+  cancelRequest: {
+    status: {
+      type: String,
+      enum: ['none', 'pending', 'approved', 'rejected'],
+      default: 'none',
+    },
+    reason: String,
+    requestedAt: Date,
+    adminResponse: String,
+    respondedAt: Date,
+    respondedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+  },
+  deliveredAt: Date,
   createdAt: {
     type: Date,
     default: Date.now,

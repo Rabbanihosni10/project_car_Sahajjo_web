@@ -13,6 +13,10 @@ const {
   getMyOrders,
   getOrderById,
   updateOrderStatus,
+  requestCancelOrder,
+  handleCancelRequest,
+  getOrderHistory,
+  getCancelledOrders,
 } = require('../controllers/productController');
 const { protect, authorize } = require('../middlewares/auth');
 
@@ -29,7 +33,11 @@ router.put('/:id/verify', protect, authorize('admin'), verifyProduct);
 router.post('/orders', protect, createOrder);
 router.get('/orders', protect, authorize('admin'), getAllOrders);
 router.get('/orders/my/orders', protect, getMyOrders);
+router.get('/orders/history', protect, getOrderHistory);
+router.get('/orders/cancelled', protect, authorize('admin'), getCancelledOrders);
 router.get('/orders/:id', protect, getOrderById);
 router.put('/orders/:id/status', protect, authorize('admin'), updateOrderStatus);
+router.post('/orders/:id/cancel-request', protect, requestCancelOrder);
+router.put('/orders/:id/cancel-request', protect, authorize('admin'), handleCancelRequest);
 
 module.exports = router;

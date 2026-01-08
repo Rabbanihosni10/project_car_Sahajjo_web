@@ -15,14 +15,14 @@ const server = http.createServer(app);
 // Socket.io setup
 const io = socketIo(server, {
   cors: {
-    origin: 'http://localhost:5173',
+    origin: ['http://localhost:5173', 'http://localhost:5174'],
     methods: ['GET', 'POST'],
   },
 });
 
 // Middleware
 app.use(cors({
-  origin: 'http://localhost:5173',
+  origin: ['http://localhost:5173', 'http://localhost:5174'],
   credentials: true,
 }));
 app.use(express.json());
@@ -53,6 +53,9 @@ app.use('/api/reviews', require('./routes/reviewRoutes'));
 app.use('/api/service-centers', require('./routes/serviceCenterRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/messages', require('./routes/messageRoutes'));
+app.use('/api/assistant', require('./routes/assistantRoutes'));
+app.use('/api/admin', require('./routes/adminRoutes'));
+app.use('/api/garages', require('./routes/garageRoutes'));
 
 // Socket.io connection handling
 io.on('connection', (socket) => {
@@ -176,4 +179,11 @@ server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🌐 API: http://localhost:${PORT}`);
   console.log(`🔌 Socket.io ready for connections`);
+}).on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`❌ Port ${PORT} is already in use. Please kill the existing process or use a different port.`);
+    console.log(`   To kill process on Windows: taskkill /F /PID <PID>`);
+    console.log(`   Or set PORT in .env file to use a different port.`);
+    process.exit(1);
+  }
 });

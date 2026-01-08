@@ -26,7 +26,7 @@ const CarDetails = () => {
     try {
       const response = await api.get(`/cars/${id}`);
       setCar(response.data.car);
-      if (user && response.data.car.owner._id === user.id) {
+      if (user && response.data.car.owner._id === user._id) {
         setIsOwner(true);
       }
     } catch {

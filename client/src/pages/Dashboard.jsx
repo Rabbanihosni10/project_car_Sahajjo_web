@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
-import { LogOut, User, MapPin, Briefcase, MessageCircle, ShoppingCart, Car, MessageSquare } from 'lucide-react';
+import { LogOut, User, MapPin, Briefcase, MessageCircle, ShoppingCart, Car, MessageSquare, Languages, Calendar } from 'lucide-react';
 import { motion } from 'framer-motion';
 import api from '../utils/api';
 import ThemeToggle from '../components/ThemeToggle';
@@ -13,22 +13,61 @@ const Dashboard = () => {
     jobs: 0,
     bookings: 0,
     posts: 0,
+    rentedSold: 0,
   });
 
   const fetchStats = useCallback(async () => {
     try {
+      console.log('Fetching stats for user:', user._id, 'isDriver:', isDriver, 'isOwner:', isOwner);
+      
       // Fetch relevant stats based on role
       if (isDriver) {
         const jobsRes = await api.get('/jobs/my/applications');
+        console.log('Jobs response:', jobsRes.data);
         setStats(prev => ({ ...prev, jobs: jobsRes.data.count }));
+
+        // Fetch driver's bookings
+        try {
+          const bookingsRes = await api.get('/bookings/driver/my');
+          console.log('Driver bookings response:', bookingsRes.data);
+          setStats(prev => ({ 
+            ...prev, 
+            bookings: bookingsRes.data.stats.approved + bookingsRes.data.stats.active 
+          }));
+        } catch (bookingError) {
+          console.error('Error fetching driver bookings:', bookingError);
+        }
       } else if (isOwner) {
         const jobsRes = await api.get('/jobs/my/posted');
+        console.log('Jobs response:', jobsRes.data);
         setStats(prev => ({ ...prev, jobs: jobsRes.data.count }));
+
+        // Fetch owner's bookings stats
+        try {
+          const bookingsRes = await api.get('/bookings/owner/all');
+          console.log('Owner bookings response:', bookingsRes.data);
+          setStats(prev => ({ 
+            ...prev, 
+            bookings: bookingsRes.data.stats.pending || 0,
+            rentedSold: (bookingsRes.data.stats.rented || 0) + (bookingsRes.data.stats.sold || 0)
+          }));
+        } catch (bookingError) {
+          console.error('Error fetching owner bookings:', bookingError);
+        }
+      }
+      
+      // Fetch forum posts count for current user (including pending ones)
+      try {
+        const forumRes = await api.get('/forum/my/posts');
+        console.log('Forum response:', forumRes.data);
+        setStats(prev => ({ ...prev, posts: forumRes.data.count }));
+      } catch (forumError) {
+        console.error('Error fetching forum stats:', forumError.response?.data || forumError.message);
       }
     } catch (error) {
       console.error('Error fetching stats:', error);
     }
-  }, [isDriver, isOwner]);
+  }, [isDriver, isOwner, user._id]);
 
   useEffect(() => {
     if (isDriver || isOwner) {
@@ -42,12 +81,16 @@ const Dashboard = () => {
         { icon: <Briefcase />, title: 'Review Jobs', link: '/admin/jobs', color: 'bg-purple-500' },
         { icon: <MessageCircle />, title: 'Forum Posts', link: '/admin/forum', color: 'bg-green-500' },
         { icon: <ShoppingCart />, title: 'Marketplace', link: '/marketplace', color: 'bg-indigo-500' },
+        { icon: <Languages />, title: 'AI Chat', link: '/assistant/chat', color: 'bg-teal-500' },
+        { icon: <Languages />, title: 'Translator', link: '/assistant/translate', color: 'bg-emerald-500' },
       ]
     : isDriver
     ? [
-        { icon: <Briefcase />, title: 'Find Jobs', link: '/jobs', color: 'bg-blue-500' },
-        { icon: <User />, title: 'My Applications', link: '/jobs/my-applications', color: 'bg-purple-500' },
-        { icon: <MessageCircle />, title: 'Messages', link: '/messages', color: 'bg-green-500' },
+        { icon: <Car />, title: 'Browse Cars', link: '/cars', color: 'bg-blue-500' },
+        { icon: <Briefcase />, title: 'Find Jobs', link: '/jobs', color: 'bg-purple-500' },
+        { icon: <User />, title: 'My Applications', link: '/jobs/my-applications', color: 'bg-green-500' },
+        { icon: <Calendar />, title: 'My Bookings', link: '/bookings/my', color: 'bg-pink-500' },
+        { icon: <MessageCircle />, title: 'Messages', link: '/messages', color: 'bg-orange-500' },
         { icon: <MessageSquare />, title: 'Forum', link: '/forum', color: 'bg-cyan-500' },
         { icon: <MapPin />, title: 'Service Centers', link: '/map', color: 'bg-red-500' },
         { icon: <ShoppingCart />, title: 'Marketplace', link: '/marketplace', color: 'bg-indigo-500' },
@@ -56,6 +99,7 @@ const Dashboard = () => {
         { icon: <Car />, title: 'My Cars', link: '/cars', color: 'bg-blue-500' },
         { icon: <Briefcase />, title: 'Post Job', link: '/jobs/create', color: 'bg-purple-500' },
         { icon: <User />, title: 'My Jobs', link: '/jobs/my-posted', color: 'bg-green-500' },
+        { icon: <Calendar />, title: 'Booking Requests', link: '/bookings/requests', color: 'bg-pink-500' },
         { icon: <MessageCircle />, title: 'Messages', link: '/messages', color: 'bg-orange-500' },
         { icon: <MessageSquare />, title: 'Forum', link: '/forum', color: 'bg-cyan-500' },
         { icon: <MapPin />, title: 'Find Drivers', link: '/map', color: 'bg-red-500' },
@@ -116,6 +160,15 @@ const Dashboard = () => {
         </motion.div>
 
         {/* Stats Cards */}
+        <div className="flex justify-between items-center mb-8">
+          <h2 className="text-2xl font-bold dark:text-white">Your Stats</h2>
+          <button
+            onClick={fetchStats}
+            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm transition-all"
+          >
+            🔄 Refresh
+          </button>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -134,7 +187,9 @@ const Dashboard = () => {
             transition={{ delay: 0.2 }}
             className="glass p-6 rounded-xl"
           >
-            <h3 className="text-gray-600 dark:text-gray-300 mb-2">Bookings</h3>
+            <h3 className="text-gray-600 dark:text-gray-300 mb-2">
+              {isDriver ? 'My Bookings' : 'Pending Requests'}
+            </h3>
             <p className="text-3xl font-bold dark:text-white">{stats.bookings}</p>
           </motion.div>
           <motion.div
@@ -143,8 +198,10 @@ const Dashboard = () => {
             transition={{ delay: 0.3 }}
             className="glass p-6 rounded-xl"
           >
-            <h3 className="text-gray-600 dark:text-gray-300 mb-2">Forum Posts</h3>
-            <p className="text-3xl font-bold dark:text-white">{stats.posts}</p>
+            <h3 className="text-gray-600 dark:text-gray-300 mb-2">
+              {isOwner ? 'Rented/Sold Cars' : 'Forum Posts'}
+            </h3>
+            <p className="text-3xl font-bold dark:text-white">{isOwner ? stats.rentedSold : stats.posts}</p>
           </motion.div>
         </div>
 
@@ -209,14 +266,30 @@ const Dashboard = () => {
               </p>
             </div>
           </div>
-          <Link
-            to="/profile"
-            className="mt-6 inline-block px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all"
-          >
-            Edit Profile
-          </Link>
+          <div className="mt-6 flex gap-4">
+            {!isAdmin && (
+              <button
+                onClick={() => setContactModalOpen(true)}
+                className="px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-all flex items-center gap-2"
+              >
+                <Mail className="w-5 h-5" />
+                Contact Admin
+              </button>
+            )}
+            <Link
+              to="/profile"
+              className="inline-block px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all"
+            >
+              Edit Profile
+            </Link>
+          </div>
         </motion.div>
       </div>
+      
+      <ContactFormModal 
+        isOpen={contactModalOpen} 
+        onClose={() => setContactModalOpen(false)} 
+      />
     </div>
   );
 };

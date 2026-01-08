@@ -6,6 +6,11 @@ const forumSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
+  category: {
+    type: String,
+    enum: ['general', 'maintenance', 'buy-sell', 'jobs', 'tips', 'news'],
+    default: 'general',
+  },
   title: {
     type: String,
     required: true,
@@ -39,6 +44,11 @@ const forumSchema = new mongoose.Schema({
   isModerated: {
     type: Boolean,
     default: false,
+  },
+  moderationStatus: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending',
   },
   createdAt: {
     type: Date,

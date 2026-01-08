@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
-import { MapPin, Navigation, Wrench, AlertCircle, RefreshCw } from 'lucide-react';
+import { MapPin, Navigation, Wrench, AlertCircle, RefreshCw, Phone, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const mapContainerStyle = {
@@ -17,6 +17,84 @@ const center = {
   lng: 90.4125,
 };
 
+// Mock data for demonstration
+const mockGarages = [
+  {
+    id: 'garage-1',
+    name: 'AutoCare Dhaka - Gulshan',
+    address: 'Plot 5, Block A, Gulshan 2, Dhaka',
+    position: { lat: 23.8042, lng: 90.4181 },
+    rating: 4.8,
+    isOpen: true,
+    phone: '+880 2 9882234',
+    services: ['Oil Change', 'Brake Service', 'Battery Replacement'],
+  },
+  {
+    id: 'garage-2',
+    name: 'Premium Car Service Center',
+    address: 'Dhanmondi, Dhaka 1205',
+    position: { lat: 23.7479, lng: 90.3667 },
+    rating: 4.5,
+    isOpen: true,
+    phone: '+880 1713456789',
+    services: ['General Maintenance', 'AC Repair', 'Suspension'],
+  },
+  {
+    id: 'garage-3',
+    name: 'Mirpur Auto Garage',
+    address: 'Mirpur 12, Dhaka',
+    position: { lat: 23.8144, lng: 90.3785 },
+    rating: 4.2,
+    isOpen: false,
+    phone: '+880 1612345678',
+    services: ['Tyre Service', 'Engine Repair', 'Welding'],
+  },
+  {
+    id: 'garage-4',
+    name: 'Express Car Care',
+    address: 'Banani, Dhaka 1213',
+    position: { lat: 23.8261, lng: 90.3832 },
+    rating: 4.6,
+    isOpen: true,
+    phone: '+880 1712345678',
+    services: ['Quick Service', 'Wash & Polish', 'Detailing'],
+  },
+  {
+    id: 'garage-5',
+    name: 'TechAuto Service',
+    address: 'Uttara, Dhaka 1230',
+    position: { lat: 23.8699, lng: 90.4034 },
+    rating: 4.4,
+    isOpen: true,
+    phone: '+880 1612345679',
+    services: ['Computer Diagnosis', 'Electric Repair', 'Paint Job'],
+  },
+];
+
+const mockDrivers = [
+  {
+    _id: 'driver-1',
+    name: 'Ahmed Hassan',
+    location: { latitude: 23.8150, longitude: 90.4200, lastUpdated: new Date() },
+    phone: '+880 1911111111',
+    rating: 4.9,
+  },
+  {
+    _id: 'driver-2',
+    name: 'Karim Khan',
+    location: { latitude: 23.7550, longitude: 90.3700, lastUpdated: new Date() },
+    phone: '+880 1922222222',
+    rating: 4.7,
+  },
+  {
+    _id: 'driver-3',
+    name: 'Rauf Ali',
+    location: { latitude: 23.8300, longitude: 90.3900, lastUpdated: new Date() },
+    phone: '+880 1933333333',
+    rating: 4.6,
+  },
+];
+
 const libraries = ['places'];
 
 const LiveMap = () => {
@@ -28,6 +106,9 @@ const LiveMap = () => {
   const [showTraffic, setShowTraffic] = useState(true);
   const [map, setMap] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [scriptLoaded, setScriptLoaded] = useState(false);
+  const [mapError, setMapError] = useState(null);
+  const garagesFetchedRef = useRef(false);
 
   // All functions declared FIRST
 
@@ -56,10 +137,44 @@ const LiveMap = () => {
     try {
       const response = await api.get('/users/drivers/locations');
       console.log('Driver locations response:', response.data);
-      setDrivers(response.data.drivers || []);
+      setDrivers(response.data.drivers || mockDrivers);
     } catch (error) {
       console.error('Error fetching drivers:', error);
-      toast.error('Failed to fetch drivers');
+      // Use mock data as fallback
+      setDrivers(mockDrivers);
+      toast.error('Using demo drivers (offline mode)');
+    }
+  }, []);
+
+  const mapGarageFromServer = (g) => ({
+    id: g._id,
+    name: g.name,
+    address: g.address,
+    position: {
+      lat: g.location?.latitude,
+      lng: g.location?.longitude,
+    },
+    rating: g.rating,
+    isOpen: g.isOpen,
+    phone: g.phone,
+  });
+
+  const fetchApprovedGarages = useCallback(async () => {
+    if (garagesFetchedRef.current) return;
+    garagesFetchedRef.current = true;
+    try {
+      const res = await api.get('/garages');
+      const list = (res.data?.garages || [])
+        .filter((g) => g?.location?.latitude && g?.location?.longitude)
+        .map(mapGarageFromServer);
+      if (list.length > 0) {
+        setNearbyGarages(list);
+      } else {
+        setNearbyGarages(mockGarages);
+      }
+    } catch (err) {
+      console.error('Failed to load garages from server:', err);
+      setNearbyGarages(mockGarages);
     }
   }, []);
 
@@ -81,43 +196,57 @@ const LiveMap = () => {
   };
 
   const searchNearbyGarages = useCallback(() => {
-    if (!map || !window.google) {
-      toast.error('Map not ready');
-      return;
+    // Prefer server garages first; fallback to Google Places or demo (only once)
+    if (!garagesFetchedRef.current) {
+      fetchApprovedGarages();
     }
+    // Try to use Google Maps Places API if available
+    if (map && window.google) {
+      setLoading(true);
+      const service = new window.google.maps.places.PlacesService(map);
+      
+      const request = {
+        location: userLocation,
+        radius: 5000, // 5km radius
+        type: ['car_repair', 'car_dealer'],
+        keyword: 'garage auto repair service center',
+      };
 
-    setLoading(true);
-    const service = new window.google.maps.places.PlacesService(map);
-    
-    const request = {
-      location: userLocation,
-      radius: 5000, // 5km radius
-      type: ['car_repair', 'car_dealer'],
-      keyword: 'garage auto repair service center',
-    };
-
-    service.nearbySearch(request, (results, status) => {
-      setLoading(false);
-      if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
-        const garages = results.slice(0, 10).map((place, index) => ({
-          id: `garage-${index}`,
-          name: place.name,
-          position: {
-            lat: place.geometry.location.lat(),
-            lng: place.geometry.location.lng(),
-          },
-          address: place.vicinity,
-          rating: place.rating,
-          isOpen: place.opening_hours?.open_now,
-        }));
-        setNearbyGarages(garages);
-        toast.success(`Found ${garages.length} nearby garages`);
-      } else {
-        toast.error('Could not find nearby garages');
-        console.error('Places search failed:', status);
-      }
-    });
-  }, [map, userLocation]);
+      service.nearbySearch(request, (results, status) => {
+        setLoading(false);
+        if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
+          const garages = results.slice(0, 10).map((place, index) => ({
+            id: `garage-${index}`,
+            name: place.name,
+            position: {
+              lat: place.geometry.location.lat(),
+              lng: place.geometry.location.lng(),
+            },
+            address: place.vicinity,
+            rating: place.rating,
+            isOpen: place.opening_hours?.open_now,
+          }));
+          // Merge with server garages, avoid duplicates by name + location
+          setNearbyGarages((prev) => {
+            const merged = [...prev];
+            garages.forEach((g) => {
+              const exists = merged.some(
+                (m) => m.name === g.name && Math.abs(m.position.lat - g.position.lat) < 1e-6 && Math.abs(m.position.lng - g.position.lng) < 1e-6
+              );
+              if (!exists) merged.push(g);
+            });
+            return merged;
+          });
+        } else {
+          // Fallback to mock data if Google Places fails
+          setNearbyGarages(mockGarages);
+        }
+      });
+    } else {
+      // No map available, use mock data
+      setNearbyGarages(mockGarages);
+    }
+  }, [map, userLocation, fetchApprovedGarages]);
 
   const onMapLoad = useCallback((mapInstance) => {
     setMap(mapInstance);
@@ -141,19 +270,43 @@ const LiveMap = () => {
   useEffect(() => {
     fetchDrivers();
     getUserLocation();
+    // Load approved garages from backend immediately
+    fetchApprovedGarages();
     const interval = setInterval(simulateDriverMovement, 5000);
     return () => clearInterval(interval);
-  }, [fetchDrivers]);
+  }, [fetchDrivers, fetchApprovedGarages]);
 
   // Show loading state while Google Maps library is loading
-  if (!window.google) {
+  if (!scriptLoaded) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-6">
         <div className="text-center">
-          <MapPin className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+          <MapPin className="w-16 h-16 mx-auto mb-4 text-gray-400 animate-bounce" />
           <h2 className="text-2xl font-bold mb-2 dark:text-white">Loading Map...</h2>
           <p className="text-gray-600 dark:text-gray-300 mb-4">Please wait while we initialize the map.</p>
           <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-blue-500 mx-auto"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if there was a problem
+  if (mapError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-6">
+        <div className="text-center">
+          <AlertCircle className="w-16 h-16 mx-auto mb-4 text-red-500" />
+          <h2 className="text-2xl font-bold mb-2 dark:text-white">Map Error</h2>
+          <p className="text-gray-600 dark:text-gray-300 mb-4">{mapError}</p>
+          <button
+            onClick={() => {
+              setMapError(null);
+              setScriptLoaded(false);
+            }}
+            className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-bold transition-all"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );
@@ -170,11 +323,11 @@ const LiveMap = () => {
         >
           <h1 className="text-4xl font-bold mb-2 dark:text-white flex items-center gap-3">
             <MapPin className="w-10 h-10 text-blue-500" />
-            {isOwner ? 'Find Drivers' : 'Live Map & Service Centers'}
+            {isOwner ? 'Find Drivers & Service Centers' : 'Live Map & Service Centers'}
           </h1>
           <p className="text-gray-600 dark:text-gray-300">
             {isOwner 
-              ? 'Discover available drivers near you for your jobs'
+              ? 'Discover available drivers and nearby service centers for your car maintenance needs'
               : 'Track drivers in real-time, find nearby garages, and check traffic conditions'
             }
           </p>
@@ -189,16 +342,14 @@ const LiveMap = () => {
             <Navigation className="w-4 h-4" />
             My Location
           </button>
-          {isDriver && (
-            <button
-              onClick={searchNearbyGarages}
-              disabled={loading}
-              className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg flex items-center gap-2 transition-all disabled:opacity-50"
-            >
-              <Wrench className="w-4 h-4" />
-              {loading ? 'Searching...' : 'Find Nearby Garages'}
-            </button>
-          )}
+          <button
+            onClick={searchNearbyGarages}
+            disabled={loading}
+            className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg flex items-center gap-2 transition-all disabled:opacity-50"
+          >
+            <Wrench className="w-4 h-4" />
+            {loading ? 'Searching...' : 'Find Nearby Garages'}
+          </button>
           <button
             onClick={fetchDrivers}
             className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg flex items-center gap-2 transition-all"
@@ -229,12 +380,10 @@ const LiveMap = () => {
               {isOwner ? 'Available Drivers' : 'Drivers Online'}
             </span>
           </div>
-          {isDriver && (
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full bg-red-500"></div>
-              <span className="text-sm dark:text-white">Service Centers</span>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded-full bg-red-500"></div>
+            <span className="text-sm dark:text-white">Service Centers</span>
+          </div>
           {showTraffic && (
             <div className="flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-red-500" />
@@ -252,9 +401,14 @@ const LiveMap = () => {
           <LoadScript 
             googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8'} 
             libraries={libraries}
-            onError={() => {
-              console.error('Failed to load Google Maps API');
-              toast.error('Failed to load map. Please check your API key.');
+            onLoad={() => {
+              console.log('Google Maps API loaded successfully');
+              setScriptLoaded(true);
+            }}
+            onError={(error) => {
+              console.error('Failed to load Google Maps API:', error);
+              setMapError('Failed to load Google Maps. Please check your internet connection and try again.');
+              toast.error('Failed to load map. Please check your internet connection.');
             }}
           >
             <GoogleMap
@@ -303,8 +457,8 @@ const LiveMap = () => {
                 );
               })}
 
-              {/* Garage Markers - Only show for drivers */}
-              {isDriver && nearbyGarages.map((garage) => (
+              {/* Garage Markers - Show for all users */}
+              {nearbyGarages.map((garage) => (
                 <Marker
                   key={garage.id}
                   position={garage.position}

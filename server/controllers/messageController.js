@@ -1,4 +1,5 @@
 const Message = require('../models/Message');
+const { sendNotification } = require('./notificationController');
 
 // @desc    Send a message
 // @route   POST /api/messages
@@ -7,10 +8,10 @@ exports.sendMessage = async (req, res) => {
   try {
     const { receiver, content, attachments } = req.body;
     
-    const conversationId = Message.createConversationId(req.user.id, receiver);
+    const conversationId = Message.createConversationId(req.user._id.toString(), receiver);
 
     const message = await Message.create({
-      sender: req.user.id,
+      sender: req.user._id,
       receiver,
       content,
       attachments,
@@ -24,6 +25,16 @@ exports.sendMessage = async (req, res) => {
       req.io.to(receiver).emit('new-message', message);
     }
 
+    // Send notification to receiver
+    await sendNotification(
+      receiver,
+      'New Message',
+      `${req.user.name} sent you a message`,
+      'message',
+      message._id,
+      'Message'
+    );
+
     res.status(201).json({ success: true, message });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -36,7 +47,7 @@ exports.sendMessage = async (req, res) => {
 exports.getConversation = async (req, res) => {
   try {
     const { userId } = req.params;
-    const conversationId = Message.createConversationId(req.user.id, userId);
+    const conversationId = Message.createConversationId(req.user._id.toString(), userId);
 
     const messages = await Message.find({ conversationId })
       .populate('sender receiver', 'name photo')
@@ -55,7 +66,7 @@ exports.getMyConversations = async (req, res) => {
   try {
     // Get all messages where user is sender or receiver
     const messages = await Message.find({
-      $or: [{ sender: req.user.id }, { receiver: req.user.id }],
+      $or: [{ sender: req.user._id }, { receiver: req.user._id }],
     })
       .populate('sender receiver', 'name photo')
       .sort({ createdAt: -1 });
@@ -67,7 +78,7 @@ exports.getMyConversations = async (req, res) => {
       const conversationId = msg.conversationId;
       if (!conversationsMap.has(conversationId)) {
         const otherUser =
-          msg.sender._id.toString() === req.user.id ? msg.receiver : msg.sender;
+          msg.sender._id.toString() === req.user._id.toString() ? msg.receiver : msg.sender;
         conversationsMap.set(conversationId, {
           conversationId,
           otherUser,
@@ -77,7 +88,7 @@ exports.getMyConversations = async (req, res) => {
       }
 
       // Count unread messages
-      if (!msg.isRead && msg.receiver._id.toString() === req.user.id) {
+      if (!msg.isRead && msg.receiver._id.toString() === req.user._id.toString()) {
         conversationsMap.get(conversationId).unreadCount++;
       }
     });
@@ -96,12 +107,12 @@ exports.getMyConversations = async (req, res) => {
 exports.markConversationAsRead = async (req, res) => {
   try {
     const { userId } = req.params;
-    const conversationId = Message.createConversationId(req.user.id, userId);
+    const conversationId = Message.createConversationId(req.user._id.toString(), userId);
 
     await Message.updateMany(
       {
         conversationId,
-        receiver: req.user.id,
+        receiver: req.user._id,
         isRead: false,
       },
       { isRead: true }
@@ -124,7 +135,7 @@ exports.deleteMessage = async (req, res) => {
       return res.status(404).json({ message: 'Message not found' });
     }
 
-    if (message.sender.toString() !== req.user.id) {
+    if (message.sender.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
@@ -142,7 +153,7 @@ exports.deleteMessage = async (req, res) => {
 exports.getUnreadCount = async (req, res) => {
   try {
     const count = await Message.countDocuments({
-      receiver: req.user.id,
+      receiver: req.user._id,
       isRead: false,
     });
 
