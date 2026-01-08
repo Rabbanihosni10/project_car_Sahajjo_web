@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
-import { LogOut, User, MapPin, Briefcase, MessageCircle, ShoppingCart, Car, MessageSquare, Languages, Calendar } from 'lucide-react';
+import { LogOut, User, MapPin, Briefcase, MessageCircle, ShoppingCart, Car, MessageSquare, Languages, Calendar, Mail } from 'lucide-react';
 import { motion } from 'framer-motion';
 import api from '../utils/api';
 import ThemeToggle from '../components/ThemeToggle';
@@ -15,6 +15,7 @@ const Dashboard = () => {
     posts: 0,
     rentedSold: 0,
   });
+  const [contactModalOpen, setContactModalOpen] = useState(false);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -93,6 +94,8 @@ const Dashboard = () => {
         { icon: <MessageCircle />, title: 'Messages', link: '/messages', color: 'bg-orange-500' },
         { icon: <MessageSquare />, title: 'Forum', link: '/forum', color: 'bg-cyan-500' },
         { icon: <MapPin />, title: 'Service Centers', link: '/map', color: 'bg-red-500' },
+          { icon: <Languages />, title: 'AI Chat', link: '/assistant/chat', color: 'bg-teal-500' },
+          { icon: <Languages />, title: 'Translator', link: '/assistant/translate', color: 'bg-emerald-500' },
         { icon: <ShoppingCart />, title: 'Marketplace', link: '/marketplace', color: 'bg-indigo-500' },
       ]
     : [
@@ -103,6 +106,8 @@ const Dashboard = () => {
         { icon: <MessageCircle />, title: 'Messages', link: '/messages', color: 'bg-orange-500' },
         { icon: <MessageSquare />, title: 'Forum', link: '/forum', color: 'bg-cyan-500' },
         { icon: <MapPin />, title: 'Find Drivers', link: '/map', color: 'bg-red-500' },
+          { icon: <Languages />, title: 'AI Chat', link: '/assistant/chat', color: 'bg-teal-500' },
+          { icon: <Languages />, title: 'Translator', link: '/assistant/translate', color: 'bg-emerald-500' },
         { icon: <ShoppingCart />, title: 'Marketplace', link: '/marketplace', color: 'bg-indigo-500' },
       ];
 
@@ -285,11 +290,6 @@ const Dashboard = () => {
           </div>
         </motion.div>
       </div>
-      
-      <ContactFormModal 
-        isOpen={contactModalOpen} 
-        onClose={() => setContactModalOpen(false)} 
-      />
     </div>
   );
 };

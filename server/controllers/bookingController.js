@@ -15,9 +15,14 @@ exports.createBooking = async (req, res) => {
     const { car, startDate, endDate, rateType, pickupLocation, dropLocation, notes } = req.body;
 
     // Check if car exists and is available
-    const carData = await Car.findById(car);
+    const carData = await Car.findById(car).populate('owner');
     if (!carData) {
       return res.status(404).json({ message: 'Car not found' });
+    }
+
+    // Check if user is trying to book their own car
+    if (carData.owner._id.toString() === req.user._id.toString()) {
+      return res.status(400).json({ message: 'You cannot book your own car' });
     }
 
     if (carData.status !== 'available') {
@@ -313,13 +318,14 @@ exports.requestBooking = async (req, res) => {
     await booking.populate('car renter owner');
 
     // Notify car owner
-    await sendNotification({
-      userId: car.owner._id,
-      type: 'booking_request',
-      title: 'New Booking Request',
-      message: `${req.user.name} wants to ${bookingType} your ${car.brand} ${car.model}`,
-      link: `/bookings/requests`
-    });
+    await sendNotification(
+      car.owner._id,
+      'New Booking Request',
+      `${req.user.name} wants to ${bookingType} your ${car.brand} ${car.model}`,
+      'booking',
+      booking._id,
+      'Booking'
+    );
 
     res.status(201).json({
       success: true,
@@ -414,13 +420,14 @@ exports.approveBooking = async (req, res) => {
     await booking.save();
 
     // Notify driver
-    await sendNotification({
-      userId: booking.renter._id,
-      type: 'booking_approved',
-      title: 'Booking Approved!',
-      message: `Your request to ${booking.bookingType} ${booking.car.brand} ${booking.car.model} has been approved!`,
-      link: `/bookings/my`
-    });
+    await sendNotification(
+      booking.renter._id,
+      'Booking Approved!',
+      `Your request to ${booking.bookingType} ${booking.car.brand} ${booking.car.model} has been approved!`,
+      'booking',
+      booking._id,
+      'Booking'
+    );
 
     res.json({
       success: true,
@@ -466,13 +473,14 @@ exports.rejectBooking = async (req, res) => {
     await booking.save();
 
     // Notify driver
-    await sendNotification({
-      userId: booking.renter._id,
-      type: 'booking_rejected',
-      title: 'Booking Rejected',
-      message: `Your request to ${booking.bookingType} ${booking.car.brand} ${booking.car.model} was rejected: ${rejectionReason}`,
-      link: `/bookings/my`
-    });
+    await sendNotification(
+      booking.renter._id,
+      'Booking Rejected',
+      `Your request to ${booking.bookingType} ${booking.car.brand} ${booking.car.model} was rejected: ${rejectionReason}`,
+      'booking',
+      booking._id,
+      'Booking'
+    );
 
     res.json({
       success: true,

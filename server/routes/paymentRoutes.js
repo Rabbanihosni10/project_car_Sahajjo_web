@@ -6,12 +6,14 @@ const {
   handleIPN,
   getTransactionStatus,
   initiateRefund,
+  createPaymentIntent,
 } = require('../controllers/paymentController');
 const { protect, authorize } = require('../middlewares/auth');
 
 router.post('/init', protect, initPayment);
 router.post('/validate', protect, validatePayment);
 router.post('/ipn', handleIPN);
+router.post('/create-intent', protect, createPaymentIntent);
 router.get('/status/:transactionId', protect, getTransactionStatus);
 router.post('/refund', protect, authorize('admin'), initiateRefund);
 

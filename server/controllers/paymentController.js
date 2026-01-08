@@ -1,4 +1,5 @@
 const SSLCommerzPayment = require('sslcommerz-lts');
+const Booking = require('../models/Booking');
 
 // SSLCommerz Sandbox Credentials
 const store_id = 'skill6800aa2b1a8fd';
@@ -78,15 +79,23 @@ exports.validatePayment = async (req, res) => {
   try {
     const { val_id } = req.body;
 
+    if (!val_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation ID is required',
+      });
+    }
+
     const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live);
     const validationResponse = await sslcz.validate({ val_id });
 
-    if (validationResponse.status === 'VALID' || validationResponse.status === 'VALIDATED') {
-      // Payment is valid, update order status in database
+    if (validationResponse?.status === 'VALID' || validationResponse?.status === 'VALIDATED') {
+      // Payment is valid
       res.json({
         success: true,
         message: 'Payment validated successfully',
         data: validationResponse,
+        amount: validationResponse?.amount,
       });
     } else {
       res.status(400).json({
@@ -113,8 +122,38 @@ exports.handleIPN = async (req, res) => {
     const ipnData = req.body;
     console.log('IPN Received:', ipnData);
 
-    // Process IPN data and update database accordingly
-    // This is called by SSLCommerz after payment completion
+    // Extract transaction ID and booking ID from IPN data
+    const { tran_id, status, val_id } = ipnData;
+
+    if (!tran_id) {
+      return res.status(400).send('No transaction ID');
+    }
+
+    // Extract booking ID from transaction ID (BOOKING{bookingId}{timestamp})
+    const bookingIdMatch = tran_id.match(/BOOKING([a-f0-9]+)/);
+    if (!bookingIdMatch) {
+      console.warn('Could not extract booking ID from tran_id:', tran_id);
+      return res.status(200).send('IPN Received');
+    }
+
+    const bookingId = bookingIdMatch[1];
+
+    // Update booking payment status based on transaction status
+    if (status === 'VALID' || status === 'VALIDATED' || ipnData.status === 'VALIDATIONFAILED') {
+      // Payment was successful
+      const booking = await Booking.findByIdAndUpdate(
+        bookingId,
+        {
+          paymentStatus: 'paid',
+          status: 'confirmed',
+          transactionId: tran_id,
+          validationId: val_id,
+        },
+        { new: true }
+      );
+
+      console.log('Booking updated:', booking);
+    }
 
     res.status(200).send('IPN Received');
   } catch (error) {
@@ -182,6 +221,81 @@ exports.initiateRefund = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Refund error',
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Create payment intent for booking
+// @route   POST /api/payments/create-intent
+// @access  Private
+exports.createPaymentIntent = async (req, res) => {
+  try {
+    const { bookingId, amount } = req.body;
+    const user = req.user;
+
+    if (!bookingId || !amount) {
+      return res.status(400).json({ message: 'Booking ID and amount are required' });
+    }
+
+    const transactionId = `BOOKING${bookingId}${Date.now()}`;
+
+    const data = {
+      total_amount: amount,
+      currency: 'BDT',
+      tran_id: transactionId,
+      success_url: `http://localhost:5173/payment/success?tran_id=${transactionId}&booking_id=${bookingId}`,
+      fail_url: `http://localhost:5173/payment/fail?tran_id=${transactionId}`,
+      cancel_url: `http://localhost:5173/payment/fail?tran_id=${transactionId}`,
+      ipn_url: 'http://localhost:5000/api/payments/ipn',
+      shipping_method: 'NO',
+      product_name: 'Car Rental Booking',
+      product_category: 'Rental',
+      product_profile: 'general',
+      cus_name: user.name,
+      cus_email: user.email,
+      cus_add1: user.address || 'Dhaka',
+      cus_add2: 'Bangladesh',
+      cus_city: 'Dhaka',
+      cus_state: 'Dhaka',
+      cus_postcode: '1000',
+      cus_country: 'Bangladesh',
+      cus_phone: user.phone || '01700000000',
+      cus_fax: '01700000000',
+      ship_name: user.name,
+      ship_add1: 'Dhaka',
+      ship_add2: 'Bangladesh',
+      ship_city: 'Dhaka',
+      ship_state: 'Dhaka',
+      ship_postcode: 1000,
+      ship_country: 'Bangladesh',
+    };
+
+    const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live);
+    const apiResponse = await sslcz.init(data);
+
+    const GatewayPageURL = apiResponse.GatewayPageURL || apiResponse.redirectGatewayURL;
+
+    if (!GatewayPageURL) {
+      return res.status(400).json({
+        success: false,
+        message: 'Failed to initialize payment gateway',
+        error: 'No gateway URL returned',
+      });
+    }
+
+    res.json({
+      success: true,
+      clientSecret: transactionId,
+      gatewayURL: GatewayPageURL,
+      transactionId: transactionId,
+      message: 'Payment intent created successfully',
+    });
+  } catch (error) {
+    console.error('Payment Intent Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create payment intent',
       error: error.message,
     });
   }

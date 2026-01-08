@@ -1,35 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Phone, MapPin, Send, MessageCircle, Clock, Facebook, Twitter, Instagram } from 'lucide-react';
+import { Mail, Phone, MapPin, MessageCircle, Clock, Facebook, Twitter, Instagram } from 'lucide-react';
 import toast from 'react-hot-toast';
+import ContactFormCard from '../components/ContactFormCard';
 
 const ContactUs = () => {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    subject: '',
-    message: ''
-  });
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-
-    // Simulate form submission
-    setTimeout(() => {
-      toast.success('Message sent successfully! We\'ll get back to you soon.');
-      setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
-      setLoading(false);
-    }, 1500);
-  };
-
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
   const contactInfo = [
     {
       icon: <Phone className="w-6 h-6" />,
@@ -143,106 +119,18 @@ const ContactUs = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-16">
           {/* Contact Form */}
+
+
+
+
+
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.3 }}
             className="glass p-8 rounded-2xl"
           >
-            <div className="flex items-center gap-3 mb-6">
-              <MessageCircle className="w-8 h-8 text-blue-500" />
-              <h2 className="text-3xl font-bold dark:text-white">Send us a Message</h2>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold mb-2 dark:text-white">
-                  Full Name *
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  required
-                  value={formData.name}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="Enter your name"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold mb-2 dark:text-white">
-                    Email *
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    required
-                    value={formData.email}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
-                    placeholder="your@email.com"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold mb-2 dark:text-white">
-                    Phone
-                  </label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
-                    placeholder="+880 1234-567890"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold mb-2 dark:text-white">
-                  Subject *
-                </label>
-                <input
-                  type="text"
-                  name="subject"
-                  required
-                  value={formData.subject}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="How can we help you?"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold mb-2 dark:text-white">
-                  Message *
-                </label>
-                <textarea
-                  name="message"
-                  required
-                  rows={6}
-                  value={formData.message}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none resize-none"
-                  placeholder="Tell us more about your inquiry..."
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full px-6 py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white rounded-lg font-bold transition-all flex items-center justify-center gap-2"
-              >
-                {loading ? 'Sending...' : (
-                  <>
-                    <Send className="w-5 h-5" />
-                    Send Message
-                  </>
-                )}
-              </button>
-            </form>
+            <ContactFormCard />
           </motion.div>
 
           {/* FAQ Section */}
@@ -305,25 +193,6 @@ const ContactUs = () => {
         </motion.div>
       </section>
 
-      {/* Footer */}
-      <footer className="glass-dark border-t border-white/10 py-8">
-        <div className="container mx-auto px-6 text-center">
-          <p className="text-gray-300">
-            © 2026 Car Sahajjo. All rights reserved.
-          </p>
-          <div className="flex justify-center gap-6 mt-4">
-            <Link to="/about" className="text-gray-300 hover:text-blue-400 transition-all">
-              About Us
-            </Link>
-            <Link to="/contact" className="text-gray-300 hover:text-blue-400 transition-all">
-              Contact
-            </Link>
-            <Link to="/login" className="text-gray-300 hover:text-blue-400 transition-all">
-              Login
-            </Link>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Calendar, Shield, ArrowLeft, MessageCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 const CarDetails = () => {
   const { id } = useParams();
   const { isAuthenticated, user } = useAuth();
+  const navigate = useNavigate();
   const [car, setCar] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isOwner, setIsOwner] = useState(false);
@@ -21,6 +22,9 @@ const CarDetails = () => {
     notes: '',
   });
   const [showBookingModal, setShowBookingModal] = useState(false);
+  const [calculatedAmount, setCalculatedAmount] = useState(0);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [bookingId, setBookingId] = useState(null);
 
   const fetchCarDetails = useCallback(async () => {
     try {
@@ -40,6 +44,44 @@ const CarDetails = () => {
     fetchCarDetails();
   }, [fetchCarDetails]);
 
+  // Calculate booking amount
+  useEffect(() => {
+    if (bookingData.startDate && bookingData.endDate && car?.rentalRates) {
+      const start = new Date(bookingData.startDate);
+      const end = new Date(bookingData.endDate);
+      const durationHours = (end - start) / (1000 * 60 * 60);
+
+      let amount = 0;
+      if (bookingData.rateType === 'hourly') {
+        amount = durationHours * car.rentalRates.hourly;
+      } else {
+        const days = Math.ceil(durationHours / 24);
+        amount = days * car.rentalRates.daily;
+      }
+      setCalculatedAmount(Math.max(0, amount));
+    }
+  }, [bookingData.startDate, bookingData.endDate, bookingData.rateType, car]);
+
+  const handleContactOwner = async () => {
+    if (!isAuthenticated) {
+      toast.error('Please login to contact owner');
+      return;
+    }
+
+    if (!car?.owner) {
+      toast.error('Owner information not available');
+      return;
+    }
+
+    try {
+      // Navigate to messages page with the owner's ID
+      navigate(`/messages/${car.owner._id}`);
+    } catch (error) {
+      toast.error('Failed to start conversation');
+      console.error(error);
+    }
+  };
+
   const handleBooking = async (e) => {
     e.preventDefault();
     if (!isAuthenticated) {
@@ -47,14 +89,34 @@ const CarDetails = () => {
       return;
     }
 
+    if (!bookingData.startDate || !bookingData.endDate) {
+      toast.error('Please select both start and end dates');
+      return;
+    }
+
+    if (!bookingData.pickupLocation || !bookingData.dropLocation) {
+      toast.error('Please fill pickup and drop locations');
+      return;
+    }
+
     try {
-      await api.post('/bookings', {
+      const bookingPayload = {
         car: id,
-        ...bookingData,
-      });
-      toast.success('Booking request sent successfully!');
+        startDate: bookingData.startDate,
+        endDate: bookingData.endDate,
+        rateType: bookingData.rateType,
+        pickupLocation: bookingData.pickupLocation,
+        dropLocation: bookingData.dropLocation,
+        notes: bookingData.notes,
+      };
+
+      const response = await api.post('/bookings', bookingPayload);
+      setBookingId(response.data.booking._id);
       setShowBookingModal(false);
+      setShowPaymentModal(true);
+      toast.success('Booking created! Please proceed to payment.');
     } catch (error) {
+      console.error('Booking error:', error);
       toast.error(error.response?.data?.message || 'Booking failed');
     }
   };
@@ -196,7 +258,7 @@ const CarDetails = () => {
                   📞 {car.owner.phone}
                 </p>
               )}
-              <button className="w-full px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg flex items-center justify-center gap-2 transition-all">
+              <button onClick={handleContactOwner} className="w-full px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg flex items-center justify-center gap-2 transition-all">
                 <MessageCircle className="w-4 h-4" />
                 Contact Owner
               </button>
@@ -274,6 +336,24 @@ const CarDetails = () => {
             className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full"
           >
             <h3 className="text-2xl font-bold dark:text-white mb-4">Book This Car</h3>
+
+            {/* Rental Rates Display */}
+            {car?.rentalRates && (
+              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900 rounded-lg">
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">Rental Rates:</p>
+                <div className="flex gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600 dark:text-gray-300">Hourly: </span>
+                    <span className="font-bold dark:text-white">৳{car.rentalRates.hourly}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600 dark:text-gray-300">Daily: </span>
+                    <span className="font-bold dark:text-white">৳{car.rentalRates.daily}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleBooking} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium dark:text-white mb-2">
@@ -347,6 +427,20 @@ const CarDetails = () => {
                 />
               </div>
 
+              {/* Cost Breakdown */}
+              {calculatedAmount > 0 && (
+                <div className="p-3 bg-green-50 dark:bg-green-900 rounded-lg">
+                  <div className="flex justify-between mb-2">
+                    <span className="text-gray-600 dark:text-gray-300">Total Amount:</span>
+                    <span className="font-bold text-lg dark:text-white">৳{Math.round(calculatedAmount)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm border-t border-green-200 dark:border-green-700 pt-2">
+                    <span className="text-gray-600 dark:text-gray-300">Payment Required (50%):</span>
+                    <span className="font-bold dark:text-white">৳{Math.round(calculatedAmount * 0.5)}</span>
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-4">
                 <button
                   type="button"
@@ -363,6 +457,83 @@ const CarDetails = () => {
                 </button>
               </div>
             </form>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Payment Modal */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full"
+          >
+            <h3 className="text-2xl font-bold dark:text-white mb-4">Payment Details</h3>
+            
+            <div className="space-y-4 mb-6">
+              <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">Total Booking Amount</p>
+                <p className="text-2xl font-bold dark:text-white">৳{Math.round(calculatedAmount)}</p>
+              </div>
+              
+              <div className="p-3 bg-blue-50 dark:bg-blue-900 rounded-lg border-2 border-blue-200 dark:border-blue-700">
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">Amount to Pay Now (50%)</p>
+                <p className="text-2xl font-bold text-blue-600 dark:text-blue-300">৳{Math.round(calculatedAmount * 0.5)}</p>
+              </div>
+
+              <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">Remaining Amount (Due at pickup)</p>
+                <p className="text-xl font-bold dark:text-white">৳{Math.round(calculatedAmount * 0.5)}</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                onClick={async () => {
+                  try {
+                    toast.loading('Processing payment...');
+                    // Create payment intent
+                    const response = await api.post('/payments/create-intent', {
+                      bookingId: bookingId,
+                      amount: Math.round(calculatedAmount * 0.5),
+                    });
+                    
+                    toast.dismiss();
+                    
+                    // Redirect to SSLCommerz payment gateway
+                    if (response.data.gatewayURL) {
+                      window.location.href = response.data.gatewayURL;
+                    } else {
+                      toast.success('Payment initialized! Please complete the payment.');
+                      setShowPaymentModal(false);
+                      navigate('/dashboard');
+                    }
+                  } catch (error) {
+                    toast.dismiss();
+                    toast.error(error.response?.data?.message || 'Payment failed. Please try again.');
+                    console.error('Payment error:', error);
+                  }
+                }}
+                className="w-full px-4 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-semibold transition-all"
+              >
+                Proceed to Payment
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowPaymentModal(false);
+                  setBookingId(null);
+                }}
+                className="w-full px-4 py-2 bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 rounded-lg transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-4 text-center">
+              You will pay 50% now and remaining 50% at vehicle pickup
+            </p>
           </motion.div>
         </div>
       )}

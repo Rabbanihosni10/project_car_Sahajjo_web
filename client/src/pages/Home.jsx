@@ -176,26 +176,6 @@ const Home = () => {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-8 px-6 bg-gray-900 text-white">
-        <div className="container mx-auto text-center">
-          <p className="mb-4">© 2026 Car Sahajjo. All rights reserved.</p>
-          <div className="flex justify-center gap-6">
-            <Link to="/about" className="hover:text-blue-400 transition-all">
-              About Us
-            </Link>
-            <Link to="/contact" className="hover:text-blue-400 transition-all">
-              Contact Us
-            </Link>
-            <Link to="/login" className="hover:text-blue-400 transition-all">
-              Login
-            </Link>
-            <Link to="/register" className="hover:text-blue-400 transition-all">
-              Sign Up
-            </Link>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 };

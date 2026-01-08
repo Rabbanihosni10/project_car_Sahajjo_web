@@ -1,8 +1,10 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import Footer from './components/Footer';
+import ContactSection from './components/ContactSection';
 
 // Pages
 import Home from './pages/Home';
@@ -21,6 +23,7 @@ import ProductDetails from './pages/ProductDetails';
 import Cart from './pages/Cart';
 import MyOrders from './pages/MyOrders';
 import OrderHistory from './pages/OrderHistory';
+import OrderDetails from './pages/OrderDetails';
 import Jobs from './pages/Jobs';
 import JobDetails from './pages/JobDetails';
 import Forum from './pages/Forum';
@@ -37,10 +40,15 @@ import SubmitGarage from './pages/SubmitGarage';
 import ManageGarages from './pages/ManageGarages';
 import MyBookings from './pages/MyBookings';
 import BookingRequests from './pages/BookingRequests';
+import PaymentSuccess from './pages/PaymentSuccess';
+import PaymentFail from './pages/PaymentFail';
 
-function App() {
+function AppContent() {
+  const location = useLocation();
+  const showContactSection = location.pathname !== '/contact' && !location.pathname.startsWith('/messages') && location.pathname !== '/conversations';
+
   return (
-    <Router>
+    <>
       <ThemeProvider>
         <AuthProvider>
           <div className="App">
@@ -77,6 +85,8 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/admin-login" element={<AdminLogin />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/payment/success" element={<PaymentSuccess />} />
+              <Route path="/payment/fail" element={<PaymentFail />} />
 
             {/* Protected Routes */}
             <Route
@@ -174,7 +184,7 @@ function App() {
               path="/orders/:id"
               element={
                 <ProtectedRoute>
-                  <OrderHistory />
+                  <OrderDetails />
                 </ProtectedRoute>
               }
             />
@@ -311,9 +321,19 @@ function App() {
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+            {showContactSection && <ContactSection />}
+            <Footer />
           </div>
         </AuthProvider>
       </ThemeProvider>
+    </>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <AppContent />
     </Router>
   );
 }

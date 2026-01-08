@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Car as CarIcon, Search, Filter, Plus } from 'lucide-react';
+import { Car as CarIcon, Search, Filter, Plus, Send } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
+import BookingRequestModal from '../components/BookingRequestModal';
 
 const Cars = () => {
-  const { isOwner } = useAuth();
+  const { isOwner, isDriver, user } = useAuth();
   const [cars, setCars] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
@@ -22,6 +23,8 @@ const Cars = () => {
   });
   const [showFilters, setShowFilters] = useState(false);
   const [ownerView, setOwnerView] = useState(true);
+  const [bookingModalOpen, setBookingModalOpen] = useState(false);
+  const [selectedCar, setSelectedCar] = useState(null);
 
   const fetchCarsMemo = useCallback(async () => {
     try {
@@ -56,6 +59,11 @@ const Cars = () => {
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleRequestBooking = (car) => {
+    setSelectedCar(car);
+    setBookingModalOpen(true);
   };
 
   return (
